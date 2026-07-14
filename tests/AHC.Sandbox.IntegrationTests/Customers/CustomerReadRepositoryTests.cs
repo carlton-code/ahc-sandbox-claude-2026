@@ -19,6 +19,12 @@ namespace AHC.Sandbox.IntegrationTests.Customers;
 /// - CustomerID 3 is assigned Rewards tier Silver (RewardsLevelId 1, DiscountPercent 0.0009).
 ///   Rewards.RewardsLevel holds exactly three tiers: Gold (0), Silver (1), Bronze (2). 552 of
 ///   847 customers have a tier; the other 295 have none, so both branches are real seed states.
+/// - Exactly two customers are named "Orlando Gee": CustomerIDs 1 and 29773.
+/// - Exactly two are named "Roger Van Houten": CustomerIDs 635 and 30102. The surname contains a
+///   space, which is what makes it the search test that matters — see
+///   <see cref="CustomerReadRepository.SearchByNameAsync"/>.
+/// - No customer's name contains a LIKE metacharacter (%, _, [), so a search for one must return
+///   nothing rather than everything.
 /// </summary>
 public class CustomerReadRepositoryTests
 {
@@ -29,6 +35,12 @@ public class CustomerReadRepositoryTests
     private const int UnknownCustomerId = 999999;
     private const int KnownCustomerIdWithRewardsTier = 3;
     private const int KnownCustomerIdWithoutRewardsTier = 1;
+
+    // "Orlando Gee" — first name, last name, and the two together all resolve to these two rows.
+    private static readonly int[] OrlandoGeeCustomerIds = [1, 29773];
+
+    // "Roger Van Houten" — surname contains a space.
+    private static readonly int[] RogerVanHoutenCustomerIds = [635, 30102];
 
     private AdventureWorksLtDbContext _dbContext = null!;
     private CustomerReadRepository _repository = null!;
@@ -70,7 +82,7 @@ public class CustomerReadRepositoryTests
         const string sql = """
             SELECT CustomerID
             FROM SalesLT.Customer
-            ORDER BY LastName, FirstName;
+            ORDER BY LastName, FirstName, CustomerID;
             """;
 
         var connection = _dbContext.Database.GetDbConnection();
@@ -272,5 +284,147 @@ public class CustomerReadRepositoryTests
         var rewards = await _repository.GetRewardsAsync(UnknownCustomerId);
 
         Assert.That(rewards, Is.Null);
+    }
+
+    // --- SearchByNameAsync ---------------------------------------------------------------------
+
+    [Test]
+    public async Task SearchByNameAsync_FirstNameOnly_ReturnsMatches()
+    {
+        var customers = await _repository.SearchByNameAsync("Orlando");
+
+        Assert.That(customers.Select(c => c.CustomerId), Is.EqualTo(OrlandoGeeCustomerIds));
+    }
+
+    [Test]
+    public async Task SearchByNameAsync_LastNameOnly_ReturnsMatches()
+    {
+        var customers = await _repository.SearchByNameAsync("Gee");
+
+        Assert.That(customers.Select(c => c.CustomerId), Is.EqualTo(OrlandoGeeCustomerIds));
+    }
+
+    [Test]
+    public async Task SearchByNameAsync_FirstAndLastName_ReturnsMatches()
+    {
+        var customers = await _repository.SearchByNameAsync("Orlando Gee");
+
+        Assert.That(customers.Select(c => c.CustomerId), Is.EqualTo(OrlandoGeeCustomerIds));
+    }
+
+    // The case that rules out splitting the term into first/last parts: "Van Houten" is the
+    // surname, so a naive split on the first space would search for the surname "Van" and find
+    // nothing.
+    [Test]
+    public async Task SearchByNameAsync_MultiWordSurname_ReturnsMatches()
+    {
+        var customers = await _repository.SearchByNameAsync("Roger Van Houten");
+
+        Assert.That(customers.Select(c => c.CustomerId), Is.EqualTo(RogerVanHoutenCustomerIds));
+    }
+
+    // Pins a dependency on the database's default case-insensitive collation rather than assuming
+    // it: if the collation ever changed, the endpoint would quietly stop matching.
+    [Test]
+    public async Task SearchByNameAsync_IsCaseInsensitive()
+    {
+        var lower = await _repository.SearchByNameAsync("orlando gee");
+        var upper = await _repository.SearchByNameAsync("ORLANDO GEE");
+
+        Assert.That(lower.Select(c => c.CustomerId), Is.EqualTo(OrlandoGeeCustomerIds));
+        Assert.That(upper.Select(c => c.CustomerId), Is.EqualTo(OrlandoGeeCustomerIds));
+    }
+
+    // Without wildcard escaping these return every customer instead of none — the difference
+    // between a search and a table dump.
+    [TestCase("%")]
+    [TestCase("_")]
+    [TestCase("[")]
+    public async Task SearchByNameAsync_LikeWildcardInTerm_IsTreatedLiterally(string term)
+    {
+        var customers = await _repository.SearchByNameAsync(term);
+
+        Assert.That(customers, Is.Empty);
+    }
+
+    [Test]
+    public async Task SearchByNameAsync_NoMatch_ReturnsEmpty()
+    {
+        var customers = await _repository.SearchByNameAsync("zzzznomatch");
+
+        Assert.That(customers, Is.Empty);
+    }
+
+    [Test]
+    public async Task SearchByNameAsync_TrimsSurroundingWhitespace()
+    {
+        var customers = await _repository.SearchByNameAsync("  Orlando Gee  ");
+
+        Assert.That(customers.Select(c => c.CustomerId), Is.EqualTo(OrlandoGeeCustomerIds));
+    }
+
+    // Two things at once, both against a term that matches most of the table.
+    //
+    // Ordering: a client-side OrderBy can't reproduce SQL Server's collation once names carry
+    // diacritics/punctuation (see GetAllAsync_ReturnsCustomersOrderedByLastNameThenFirstName), so
+    // this compares against an independent hand-written query instead.
+    //
+    // Matching: the SQL below deliberately keeps the naive four-clause form — matching FirstName
+    // and LastName separately as well as the two concatenations — while the repository only
+    // matches the concatenations. So this isn't restating the production predicate back at itself;
+    // it pins that dropping those two clauses really is equivalent, which is the assumption the
+    // simplification rests on.
+    [Test]
+    public async Task SearchByNameAsync_MatchesAndOrdersTheSameAsEquivalentSql()
+    {
+        var customers = await _repository.SearchByNameAsync("a");
+
+        Assert.That(customers, Is.Not.Empty);
+
+        var expected = await GetSearchMatchedCustomerIdsAsync("a");
+
+        Assert.That(customers.Select(c => c.CustomerId).ToArray(), Is.EqualTo(expected));
+    }
+
+    private async Task<int[]> GetSearchMatchedCustomerIdsAsync(string term)
+    {
+        const string sql = """
+            SELECT CustomerID
+            FROM SalesLT.Customer
+            WHERE FirstName LIKE @pattern ESCAPE '\'
+               OR LastName LIKE @pattern ESCAPE '\'
+               OR (FirstName + ' ' + LastName) LIKE @pattern ESCAPE '\'
+               OR (FirstName + ' ' + ISNULL(MiddleName + ' ', '') + LastName) LIKE @pattern ESCAPE '\'
+            ORDER BY LastName, FirstName, CustomerID;
+            """;
+
+        var connection = _dbContext.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@pattern";
+            parameter.Value = $"%{term}%";
+            command.Parameters.Add(parameter);
+
+            await using var reader = await command.ExecuteReaderAsync();
+
+            var customerIds = new List<int>();
+
+            while (await reader.ReadAsync())
+            {
+                customerIds.Add(reader.GetInt32(0));
+            }
+
+            return customerIds.ToArray();
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
     }
 }

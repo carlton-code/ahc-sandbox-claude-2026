@@ -66,6 +66,15 @@ namespace AHC.Sandbox.Application.Customers.Services
             return customerDto;
         }
 
+        public async Task<IReadOnlyCollection<CustomerDto>> SearchCustomersAsync(string searchTerm, CancellationToken cancellationToken = default)
+        {
+            var customers = await _customerReadRepository.SearchByNameAsync(searchTerm, cancellationToken);
+
+            return customers
+                .Select(MapCustomer)
+                .ToArray();
+        }
+
         public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerDto customer, CancellationToken cancellationToken = default)
         {
             var createdCustomer = await _customerWriteRepository.CreateAsync(customer, cancellationToken);

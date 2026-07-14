@@ -17,9 +17,15 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
   not an empty response.
 - No authentication/authorization is configured yet — every endpoint below is open (see
   `docs/adr/` if an ADR exists for when that changes, or `ReadMe-Api.md` for the current gap).
-- No model-validation attributes (`[Required]`, etc.) are present on any DTO today, so the
+- No model-validation attributes (`[Required]`, etc.) are present on any **DTO** today, so the
   framework won't return `400` for a structurally-valid-but-semantically-wrong payload (e.g. an
-  empty `FirstName`) — only malformed JSON triggers a framework-level `400`.
+  empty `FirstName`) — only malformed JSON triggers a framework-level `400`. The sole exception is
+  `search`'s `q` **query parameter**, which is `[Required]`; that both marks it required in the
+  OpenAPI document and lets the framework return the `400` itself.
+- A `400` returns a `ValidationProblemDetails` body — a `ProblemDetails` plus an `errors` map
+  keyed by parameter name.
+- **Query parameters** are called out inline in the Path column (`?q=<term>`) rather than getting
+  their own column — `search` is the only endpoint taking one today.
 
 ## Customers — `api/v1/customers`
 
@@ -28,6 +34,7 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 | Method | Path | Request body | Response body | Status codes |
 |---|---|---|---|---|
 | GET | `/api/v1/customers` | — | `CustomerDto[]` | `200` |
+| GET | `/api/v1/customers/search?q=<term>` | — | `CustomerDto[]` | `200`, `400` |
 | GET | `/api/v1/customers/{customerId}` | — | `CustomerDto` | `200`, `404` |
 | POST | `/api/v1/customers` | `CreateCustomerDto` | `CustomerDto` | `201` (+ `Location` header via `CreatedAtAction`) |
 | PUT | `/api/v1/customers/{customerId}` | `UpdateCustomerDto` | — | `204`, `404` |
@@ -39,6 +46,30 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 | GET | `/api/v1/customers/{customerId}/recent-orders` | — | `CustomerOrderDto[]` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/order-summary` | — | `CustomerOrderSummaryDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/rewards` | — | `CustomerRewardsDto` | `200`, `404` |
+
+### Search — `GET /api/v1/customers/search?q=<term>`
+
+`q` is **required**; missing, empty, or whitespace-only returns `400` with a
+`ValidationProblemDetails` body. The term is matched as a **substring**, **case-insensitively**
+(the database's default collation), against:
+
+- a first name — `?q=Orlando`
+- a last name — `?q=Gee`
+- both, separated by a space — `?q=Orlando%20Gee`
+
+The term is **never split into first/last parts**, because this data makes that unworkable: nine
+last names contain a space (e.g. `Van Houten`), so splitting `Roger Van Houten` on the first space
+would search for the surname `Van` and find nothing, while splitting from the right breaks the six
+first names that contain a space (e.g. `Janaina Barreiro Gambaro`). The whole term is matched
+against each name column and against the name concatenations instead. See
+`CustomerReadRepository.SearchByNameAsync`.
+
+`LIKE` metacharacters (`%`, `_`, `[`) in `q` are escaped and matched literally — `?q=%` returns an
+empty array, not every customer. No matches is `200` with `[]`, never `404`. Results are ordered by
+last name, then first name, then customer id, matching `GET /api/v1/customers` — the id is the
+tiebreaker, and it's load-bearing: 812 of 847 customers share a name with someone else, so without
+it the order of those rows would be whatever the query plan emitted. There is no result cap or
+paging, consistent with that endpoint (847 customers is the ceiling).
 
 ### DTO shapes (`Application/Customers/Dtos/`)
 

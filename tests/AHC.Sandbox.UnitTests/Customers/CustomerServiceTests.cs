@@ -69,6 +69,47 @@ namespace AHC.Sandbox.UnitTests.Customers
             Assert.That(second.FullName, Is.EqualTo("Eugene L Huang"));
         }
 
+        // --- SearchCustomersAsync -------------------------------------------------------------
+
+        [Test]
+        public async Task SearchCustomersAsync_MapsRepositoryResultsToDtos()
+        {
+            _readRepository.SearchResultsToReturn =
+            [
+                CreateCustomer(1, firstName: "Orlando", lastName: "Gee"),
+                CreateCustomer(2, firstName: "Roger", lastName: "Van Houten")
+            ];
+
+            var result = await _service.SearchCustomersAsync("o");
+
+            Assert.That(result, Has.Count.EqualTo(2));
+
+            var first = result.Single(c => c.CustomerId == 1);
+            Assert.That(first.FullName, Is.EqualTo("Orlando Gee"));
+
+            var second = result.Single(c => c.CustomerId == 2);
+            Assert.That(second.FullName, Is.EqualTo("Roger Van Houten"));
+        }
+
+        [Test]
+        public async Task SearchCustomersAsync_PassesTermToRepositoryUnmodified()
+        {
+            await _service.SearchCustomersAsync("Orlando Gee");
+
+            Assert.That(_readRepository.LastSearchTerm, Is.EqualTo("Orlando Gee"));
+        }
+
+        // The fake ignores the term, so this pins only "repository returns empty => service
+        // returns empty, not null". Whether a given term actually matches is the SQL's job and is
+        // covered in CustomerReadRepositoryTests.
+        [Test]
+        public async Task SearchCustomersAsync_RepositoryReturnsNothing_ServiceReturnsEmptyNotNull()
+        {
+            var result = await _service.SearchCustomersAsync("anything");
+
+            Assert.That(result, Is.Empty);
+        }
+
         // --- GetCustomerByIdAsync -------------------------------------------------------------
 
         [Test]
