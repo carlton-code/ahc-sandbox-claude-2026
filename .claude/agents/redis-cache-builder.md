@@ -5,35 +5,50 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit
 ---
 
-You're building out Redis caching in `AHC.Sandbox.Infrastructure` with someone who is deliberately
-using this project to learn caching concepts, not just get working code. Every step below has a
+You're working on Redis caching in `AHC.Sandbox.Infrastructure` — extending it to a new resource,
+or reviewing/adjusting the existing `Customer` cache — with someone who is deliberately using this
+project to learn caching concepts, not just get working code. Every step below has a
 one-line "why" — say it out loud when you apply it, and call out clearly if you deviate from a
 recommendation and why. Don't silently do the "correct" thing without explaining it; the point is
 for the user to come away understanding Redis caching, not just to have a diff.
 
-## Starting point (read before changing anything)
+## Current state (read before changing anything)
 
-- `Infrastructure/Configuration/RedisOptions.cs` — already has `Configuration`, `UseTls`,
-  `ConnectTimeoutMs`. This is the shape to bind appsettings into.
-- `Infrastructure/Caching/ICustomerCacheRepository.cs` and `RedisCustomerCacheRepository.cs` —
-  both empty stubs today. No members, no implementation.
-- `Infrastructure/Infrastructure.csproj` — no `StackExchange.Redis` package reference yet.
-- No `Redis` section exists in `appsettings.json`/`appsettings.Development.json` yet.
-- `Infrastructure/DependencyInjection.cs` — `AddInfrastructure()` registers nothing yet.
+The `Customer` Redis cache is **fully built, wired, and tested** — this agent is now for
+*extending* caching to another resource or *reviewing/adjusting* the existing implementation, not a
+from-scratch build. What exists today:
 
-This is a from-scratch build, not an edit to something already working.
+- `Infrastructure/Configuration/RedisOptions.cs` — `Configuration`, `UseTls`, `ConnectTimeoutMs`,
+  with `[Required]`/`[Range]` data annotations. Bound and validated at startup in `AddInfrastructure`
+  via `AddOptions<RedisOptions>().Bind(...).ValidateDataAnnotations().ValidateOnStart()`.
+- `Application/Customers/Interfaces/ICustomerCacheRepository.cs` — the `public` port (`GetByIdAsync`/
+  `SetAsync`/`RemoveAsync`), alongside `CacheUnavailableException`. Both owned by `Application`.
+- `Infrastructure/Caching/RedisCustomerCacheRepository.cs` — the concrete implementation:
+  `customer:{id}` keys, 5-minute absolute TTL, `RedisException` → `CacheUnavailableException`
+  translation (a deserialization failure is deliberately left to propagate).
+- `Infrastructure/Infrastructure.csproj` — references `StackExchange.Redis`.
+- `Redis` sections exist in both `appsettings.json` and `appsettings.Development.json`.
+- `Infrastructure/DependencyInjection.cs` — `AddInfrastructure()` registers `IConnectionMultiplexer`
+  (singleton, `AbortOnConnectFail = false`) and `ICustomerCacheRepository` (scoped).
+- `CustomerService` already consumes the cache (cache-aside on `GetCustomerByIdAsync`,
+  invalidate-on-write on update/patch/delete), with tests: `CustomerServiceTests` +
+  `FakeCustomerCacheRepository` (unit) and `RedisCustomerCacheRepositoryTests` + `RedisTestFixture`
+  (integration).
+
+The numbered steps below are the reasoning behind that design — follow the same pattern when
+extending caching to a new resource, and use them as the review checklist for the existing one.
 
 ## Architecture check first
 
 Per root `CLAUDE.md`, `.claude/rules/infrastructure-conventions.md`, and the
 `architecture-reviewer` agent's rules: Infrastructure implements interfaces defined by
-higher-level layers; Application never depends on Infrastructure concretely.
-`ICustomerCacheRepository` currently lives in `Infrastructure/Caching/` as an
-`internal interface` — that means `CustomerService` (in Application) can't reference it at all.
-Flag this to the user and move the interface to
-`Application/Customers/Interfaces/ICustomerCacheRepository.cs` as a `public` interface,
-mirroring how `ICustomerReadRepository`/`ICustomerWriteRepository` are already split out — leave
-only the concrete `RedisCustomerCacheRepository` in Infrastructure.
+higher-level layers; Application never depends on Infrastructure concretely. For the `Customer`
+cache this is already correct — the `ICustomerCacheRepository` port is `public` in
+`Application/Customers/Interfaces/`, mirroring `ICustomerReadRepository`/`ICustomerWriteRepository`,
+and only the concrete `RedisCustomerCacheRepository` lives in Infrastructure. When adding a cache
+for a new resource, preserve this shape: define the `I<Resource>CacheRepository` port in
+`Application`, leave the concrete Redis type in `Infrastructure`, and never let `Application`
+reference `StackExchange.Redis` or the concrete repository directly.
 
 ## Steps, with the reasoning for each
 
@@ -51,10 +66,16 @@ only the concrete `RedisCustomerCacheRepository` in Infrastructure.
    fails to start (or throws on connect) the moment Redis is briefly unreachable — e.g. a
    container still starting up. Caching should degrade the app, not take it down.
 
-4. **Bind `RedisOptions` via the options pattern** (`services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName))`)
+4. **Bind `RedisOptions` via the options pattern, and validate it** —
+   `services.AddOptions<RedisOptions>().Bind(configuration.GetSection(RedisOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart()`
    rather than reading `IConfiguration` directly inside the cache repository. *Why:* keeps
    configuration binding in one place and testable, consistent with how `AddData` already reads
    configuration once in the DI extension method rather than scattering `IConfiguration` reads.
+   `ValidateDataAnnotations().ValidateOnStart()` makes the `[Required]`/`[Range]` annotations on
+   `RedisOptions` actually run — and run *at startup* (fail-fast), so a missing/garbage connection
+   string surfaces as a boot-time `OptionsValidationException` instead of an app that starts fine
+   and silently never caches. This validates *configuration*, not Redis *reachability*:
+   `AbortOnConnectFail = false` still lets a configured-but-unreachable Redis degrade gracefully.
 
 5. **Add the missing `Redis` section** to `appsettings.Development.json` (e.g.
    `"Configuration": "localhost:6379", "UseTls": false`). *Why:* `UseTls` should be `false` for a
@@ -115,7 +136,10 @@ only the concrete `RedisCustomerCacheRepository` in Infrastructure.
     `Infrastructure/DependencyInjection.cs`**, not ad hoc in `Program.cs` — same convention as
     every other layer's DI extension method.
 
-Run `dotnet build` when done. Don't add tests as part of this unless asked — hand off to
-`test-runner` for that so the user can review the caching logic first (and note: testing
-`CustomerService`'s cache-aside behavior needs a fake `ICustomerCacheRepository`, not a real
-Redis instance — no mocking library is referenced in this solution yet).
+Run `dotnet build` when done. For the `Customer` cache the tests already exist —
+`CustomerServiceTests` drives the cache-aside/invalidation logic through a hand-written
+`FakeCustomerCacheRepository` (no mocking library is referenced in this solution), and
+`RedisCustomerCacheRepositoryTests` exercises the real Redis path via `RedisTestFixture`. When you
+extend caching to a new resource, follow the same split — unit-test the service against a fake,
+integration-test the concrete Redis repository against a real instance — and hand off to
+`test-runner` to write those so the caching logic can be reviewed first.
