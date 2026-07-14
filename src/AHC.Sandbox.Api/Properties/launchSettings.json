@@ -1,0 +1,17 @@
+﻿{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+
+  "profiles": {
+    "AHC.Sandbox.Api": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "applicationUrl": "https://localhost:7143",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+
+}

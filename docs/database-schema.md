@@ -1,0 +1,69 @@
+# Database Schema Notes
+
+AdventureWorksLT's full schema is large — three business schemas (`SalesLT` stock tables,
+`SalesIntelligence`, `Rewards`) plus `dbo` housekeeping — and `.claude/skills/adventureworks-schema/SKILL.md`
+already has the exhaustive, verified column-level reference across all of it. This file is
+deliberately smaller: **only the tables this codebase actually touches today**, why, and the
+gotchas already discovered, so that context doesn't have to be rediscovered from scratch each
+time. If you need a column list, a type, or a schema name, go to the skill — this file won't
+repeat that detail.
+
+## Tables actually in use today
+
+### `SalesLT.Customer`
+
+The customer record backing the one fully-implemented resource, `Customer`.
+
+- **Mapped by:** `CustomerEntity` + the Fluent API config in
+  `Data/Context/AdventureWorksLtDbContext.cs`.
+- **Columns currently mapped:** `CustomerID`, `Title`, `FirstName`, `MiddleName`, `LastName`,
+  `CompanyName`, `EmailAddress`, `Phone` — a subset of the real table. `NameStyle`, `Suffix`,
+  `SalesPerson`, `rowguid`, `ModifiedDate` exist on the table but aren't mapped, and shouldn't be
+  unless a real use case needs them.
+- **No password columns.** The stock schema's `PasswordHash`/`PasswordSalt` columns were dropped
+  from this table — this API has no DB-backed authentication concept (auth, if built, will be
+  handled by an external IdP). See ADR-0007.
+- **Known gotcha:** `EmailAddress` and `Phone` are nullable in the real database, but
+  `CustomerEntity`/`Customer` both declare `EmailAddress` as non-nullable (`string`, not
+  `string?`) — a row with a null email will throw on materialization. Not yet fixed; flag it
+  again if working nearby rather than assuming it's been handled.
+- **Touched by:** `Data/Repositories/CustomerReadRepository.cs`, `CustomerWriteRepository.cs`.
+
+### `SalesLT.SalesOrderHeader`
+
+Order history queried for a customer's orders/summary endpoints.
+
+- **Not EF-mapped** — read via raw parameterized ADO.NET instead (see
+  `docs/adr/0002-ef-core-over-dapper.md` for why raw SQL rather than Dapper).
+- **Columns currently selected:** `SalesOrderID`, `CustomerID`, `SalesOrderNumber`, `OrderDate`,
+  `ShipDate`, `SubTotal`, `TaxAmt`, `Freight`, `TotalDue`.
+- **Known gotcha:** this table has a non-standard column, `TrackingNumber`, that isn't part of the
+  public AdventureWorksLT sample schema — it's real in this database, don't "correct" it away as
+  a typo.
+- **Touched by:** `CustomerReadRepository.GetOrdersByCustomerIdAsync` /
+  `GetOrderByIdAsync` / `GetRecentOrdersAsync` / `GetOrderSummaryAsync`.
+
+## Not in use
+
+No entity, mapping, query, or controller exists for these — nothing here counts as "in use."
+
+- **`SalesLT.Address`**, **`SalesLT.CustomerAddress`**, **`SalesLT.ProductCategory`** — no code
+  references these.
+- **`SalesLT.Product`** — no code references this. Has a non-standard column, `CurrentDiscount`,
+  not in the public sample.
+- The rest of `SalesLT` — `ProductModel`, `ProductDescription`, `ProductModelProductDescription`,
+  `SalesOrderDetail`, and the three catalog views (`vGetAllCategories`, `vProductAndDescription`,
+  `vProductModelCatalogDescription`).
+- **`SalesIntelligence`** and **`Rewards`** — entirely unbuilt schemas (product bundles,
+  recommendations, a customer rewards-tier program). See the schema skill for the table shapes if
+  that work starts.
+- `dbo` housekeeping tables (`BuildVersion`, `ErrorLog`, `sysdiagrams`) — never relevant to this
+  API.
+
+## Keeping this current
+
+Move a table from "not in use" to "actually in use" here in the same pass that wires up its EF
+mapping/repository (i.e., whenever `.claude/agents/api-scaffolder.md` builds out a new resource).
+Keep entries short — a purpose line, what's mapped vs. not, and any gotcha specific to how *this
+codebase* uses the table. Exhaustive column-level detail belongs in
+`.claude/skills/adventureworks-schema/SKILL.md`, not duplicated here.

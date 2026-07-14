@@ -1,0 +1,68 @@
+using AHC.Sandbox.Application;
+using AHC.Sandbox.Data;
+using AHC.Sandbox.Infrastructure;
+
+namespace AHC.Sandbox.Api
+{
+    public class Program
+    {
+        /// <summary>
+        /// <para>Application entry point.</para>
+        /// <para>
+        /// This method configures and starts the ASP.NET Core pipeline:
+        /// - Creates the WebApplicationBuilder and registers services required by the API.
+        /// - Registers project-level services via the Application, Data and Infrastructure dependency injection extension methods.
+        /// - Builds the WebApplication instance.
+        /// - Configures middleware for the HTTP request pipeline. In Development environments, OpenAPI is mapped and Swagger UI is enabled.
+        /// - Adds authorization and maps controller endpoints, then runs the web host.
+        /// </para>
+        /// </summary>
+        /// <param name="args">Command-line arguments forwarded to the host builder.</param>
+        /// <remarks>
+        /// <para>
+        /// Services registered:
+        /// - Controllers via <c>AddControllers()</c>.
+        /// - OpenAPI generation via <c>AddEndpointsApiExplorer()</c> and <c>AddOpenApi()</c>.
+        /// - Project-specific services via <c>AddApplication()</c>, <c>AddData(IConfiguration)</c>, and <c>AddInfrastructure(IConfiguration)</c>.
+        /// </para>
+        /// <para>
+        /// Development-time behavior:
+        /// - When <c>app.Environment.IsDevelopment()</c> is true, the OpenAPI document is mapped and the Swagger UI is enabled.
+        /// - The Swagger UI is configured to use the OpenAPI JSON at <c>/openapi/v1.json</c> and labeled "AHC.Sandbox.Api v1".
+        /// </para>
+        /// <para>
+        /// Notes:
+        /// - Preserve or extend middleware (e.g., exception handling, HTTPS redirection, CORS) as needed for other environments.
+        /// - The current pipeline always enables authorization and controller routing before starting the host.
+        /// </para>
+        /// </remarks>
+        public static void Main(string[] args)
+        {
+            var builder = WebApplication.CreateBuilder(args);
+
+            // Add services to the container.
+            builder.Services.AddControllers();
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddOpenApi();
+
+            builder.Services.AddApplication();
+            builder.Services.AddData(builder.Configuration);
+            builder.Services.AddInfrastructure(builder.Configuration);
+
+            var app = builder.Build();
+
+            // Configure the HTTP request pipeline.
+            if (app.Environment.IsDevelopment())
+            {
+                app.MapOpenApi();
+
+                app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "AHC.Sandbox.Api v1"));
+            }
+
+            app.UseAuthorization();
+            app.MapControllers();
+
+            app.Run();
+        }
+    }
+}

@@ -1,0 +1,6 @@
+@AHC.Sandbox.Api_HostAddress = http://localhost:5276
+
+GET {{AHC.Sandbox.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

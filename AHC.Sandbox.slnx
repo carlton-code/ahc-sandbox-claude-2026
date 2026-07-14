@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="CLAUDE.md" />
+    <File Path="README.md" />
+    <File Path="CONTRIBUTING.md" />
+  </Folder>
+  <Project Path="src/AHC.Sandbox.Api/AHC.Sandbox.Api.csproj" />
+  <Project Path="src/AHC.Sandbox.Application/AHC.Sandbox.Application.csproj" />
+  <Project Path="src/AHC.Sandbox.Data/AHC.Sandbox.Data.csproj" />
+  <Project Path="src/AHC.Sandbox.Domain/AHC.Sandbox.Domain.csproj" />
+  <Project Path="src/AHC.Sandbox.Infrastructure/AHC.Sandbox.Infrastructure.csproj" />
+  <Project Path="tests/AHC.Sandbox.UnitTests/AHC.Sandbox.UnitTests.csproj" />
+  <Project Path="tests/AHC.Sandbox.IntegrationTests/AHC.Sandbox.IntegrationTests.csproj" />
+</Solution>
