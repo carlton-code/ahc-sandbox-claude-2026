@@ -33,7 +33,7 @@ and scope are agreed before code changes land.
 | `AHC.Sandbox.Infrastructure` | Cross-cutting technical services (Redis cache, etc.) | `Application`, `Domain` |
 | `AHC.Sandbox.Api` | ASP.NET Core controllers, `Program.cs` composition root | all of the above |
 | `AHC.Sandbox.UnitTests` | Fast NUnit tests against fakes — `Domain`/`Application` logic only | all of the above |
-| `AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure (SQL Server, eventually Redis, end-to-end `Api`) | all of the above |
+| `AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure (SQL Server and Redis today; end-to-end `Api` not yet) | all of the above |
 
 Dependency direction: `Domain` has no outward dependencies; `Application` defines interfaces and
 orchestrates but never references `Data`/`Api`/`Infrastructure` concretely; `Data`/`Infrastructure`
@@ -58,7 +58,7 @@ summary.
 ## Dependency injection convention
 
 Every layer exposes a single `Add<LayerName>()` extension method in its own `DependencyInjection.cs`
-(`AddApplication()`, `AddData(IConfiguration)`, `AddInfrastructure()`). `Program.cs` composes
+(`AddApplication()`, `AddData(IConfiguration)`, `AddInfrastructure(IConfiguration)`). `Program.cs` composes
 these plus `AddControllers()`/`AddOpenApi()`. New services/repositories get registered inside the
 extension method for the layer that implements them, not in `Program.cs` directly.
 
