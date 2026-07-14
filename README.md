@@ -19,10 +19,10 @@ endpoints) is the only resource in the API today.
 | `src/AHC.Sandbox.Domain` | Core business entities (`Customer`, ...). No framework dependencies. |
 | `src/AHC.Sandbox.Application` | Use cases: DTOs, service interfaces, service implementations. Depends only on `Domain`. |
 | `src/AHC.Sandbox.Data` | EF Core `DbContext`, entity mappings, repository implementations. Talks to SQL Server. |
-| `src/AHC.Sandbox.Infrastructure` | Cross-cutting technical services (Redis caching config — scaffolded, not yet wired in). |
+| `src/AHC.Sandbox.Infrastructure` | Cross-cutting technical services. Redis caching is wired into `CustomerService` (cache-aside on reads, invalidate-on-write on mutations) via `AddInfrastructure`. |
 | `src/AHC.Sandbox.Api` | ASP.NET Core host: controllers, `Program.cs`, Swagger/OpenAPI. |
 | `tests/AHC.Sandbox.UnitTests` | Fast NUnit tests against fakes — no real database or Redis. |
-| `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure (SQL Server, eventually Redis, end-to-end `Api`). Scaffolding only today. |
+| `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure — real SQL Server (`Customers/`) and a real Redis instance (`Caching/`) today; a `WebApplicationFactory`-based end-to-end `Api` test is the remaining gap. |
 
 Dependencies flow one direction: `Api` → `Application`/`Data`/`Infrastructure` → `Domain`. Each
 project has its own `ReadMe-<Project>.md` with the detailed purpose/responsibilities/design

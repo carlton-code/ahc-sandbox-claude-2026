@@ -36,18 +36,20 @@ output back.
   (`ICustomerReadRepository` etc.).
 - **`tests/AHC.Sandbox.IntegrationTests`** — anything that fundamentally needs the real thing to
   mean anything: raw ADO.NET repository methods (`CustomerReadRepository.GetOrderSummaryAsync`
-  etc.) against a real SQL Server, `Infrastructure`'s Redis caching once it exists, or a full
-  end-to-end `Api` test. This project is scaffolding only today — the first real test added here
-  needs to wire up its own connection configuration (see that project's `ReadMe-IntegrationTests.md`)
-  rather than assuming one already exists.
+  etc.) against a real SQL Server, `Infrastructure`'s Redis caching
+  (`RedisCustomerCacheRepositoryTests`), or a full end-to-end `Api` test. Connection configuration
+  is already wired up via this project's own `appsettings.json` plus `Infrastructure/TestConfiguration.cs`,
+  `DbContextTestFactory.cs`, and `RedisTestFixture.cs` (see `ReadMe-IntegrationTests.md`) — reuse
+  those rather than adding a second way to read connection strings. The remaining gap is a
+  `WebApplicationFactory<Program>`-based end-to-end `Api` test.
 
 If in doubt, default to `UnitTests` with a fake — only reach for `IntegrationTests` when a fake
 genuinely can't exercise what needs testing.
 
 ## Writing new tests
 
-Follow the existing style in `tests/AHC.Sandbox.UnitTests/UnitTest1.cs` /
-`tests/AHC.Sandbox.IntegrationTests/IntegrationTest1.cs`:
+Follow the existing style in `tests/AHC.Sandbox.UnitTests/Customers/CustomerServiceTests.cs` /
+`tests/AHC.Sandbox.IntegrationTests/Customers/CustomerReadRepositoryTests.cs`:
 
 - `[SetUp]` for per-test setup, `[Test]` on test methods, `Assert.That(actual, Is.EqualTo(expected))`
   constraint-model assertions (or `Assert.Pass()` only as a placeholder, never in a real test).

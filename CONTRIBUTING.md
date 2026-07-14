@@ -69,10 +69,6 @@ declared it non-nullable, throwing on materialization for any row with a null
 email. See docs/database-schema.md's known-gotcha note.
 ```
 
-If Claude Code authored or co-authored the change, its usual `Co-Authored-By: Claude <...>`
-commit trailer is expected and shouldn't be stripped — this project is developed with heavy AI
-assistance and the trailer is accurate provenance, not noise.
-
 ## Before opening a pull request (or merging to `main` solo)
 
 - [ ] `dotnet build` succeeds with no new warnings.

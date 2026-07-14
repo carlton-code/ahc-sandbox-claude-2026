@@ -23,8 +23,9 @@ This project is responsible for:
 - Testing `Data` repository behavior against a real SQL Server — especially the raw ADO.NET
   methods in `CustomerReadRepository` (`GetOrderSummaryAsync`, `ExecuteOrderQueryAsync`) that a
   fake repository can't meaningfully exercise, since their whole job is running real SQL
-- Testing `Infrastructure`'s Redis caching once it's built out (see
-  `.claude/agents/redis-cache-builder.md`) against a real Redis instance
+- Testing `Infrastructure`'s Redis caching against a real Redis instance —
+  `Caching/RedisCustomerCacheRepositoryTests.cs` on top of `Infrastructure/RedisTestFixture.cs`
+  (see `.claude/agents/redis-cache-builder.md` for the pattern under test)
 - Optionally, full end-to-end `Api` tests (real HTTP request → real controller → real database)
   where that's more valuable than testing a repository in isolation
 

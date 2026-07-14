@@ -7,8 +7,11 @@ The `AHC.Sandbox.UnitTests` project contains the fast, isolated tests for the so
 use-case logic without touching a real database, Redis, or the network. For anything that needs
 real infrastructure, see the sibling `AHC.Sandbox.IntegrationTests` project instead.
 
-**Current state:** `UnitTest1.cs` is the default scaffolded placeholder (`Assert.Pass()`), not a
-meaningful test yet. Adding real coverage as resources get built out is expected, not optional.
+**Current state:** real coverage exists — `Customers/CustomerServiceTests.cs` exercises
+`CustomerService` (including its cache-aside/invalidation behavior) against hand-written fakes under
+`Customers/Fakes/` (`FakeCustomerReadRepository`, `FakeCustomerWriteRepository`,
+`FakeCustomerCacheRepository`), and `Domain/CustomerTests.cs` covers `Domain` invariants. Adding
+more coverage as resources get built out is expected, not optional.
 
 ## Responsibilities
 
