@@ -218,20 +218,52 @@ Backs product bundles and recommendations. Use the exact schema name in EF mappi
 - **CustomerRecommendations**: `CustomerId` (FK → `SalesLT.Customer`), `ProductId` (FK →
   `SalesLT.Product`) — per-customer recommended products.
 
-## Rewards schema — no code references these yet
+## Rewards schema — read by `GET /api/v1/customers/{id}/rewards`
 
-Backs a customer rewards-tier program. Use the exact schema name in EF mappings, e.g.
-`entity.ToTable("RewardsLevel", "Rewards")`.
+Backs a customer rewards-tier program. Verified against the live database 2026-07-14. Neither
+table is EF-mapped: they're read via raw ADO.NET in `CustomerReadRepository.GetRewardsAsync`, so
+use the fully-qualified `Rewards.<Table>` name in SQL. If you ever do map them, use the exact
+schema name, e.g. `entity.ToTable("RewardsLevel", "Rewards")`.
 
-- **RewardsLevel**: `RewardsLevelId` (PK, int), `RewardsLevelName` varchar(50) NOT NULL,
-  `DiscountPercent` decimal (nullable).
-- **CustomerRewardsLevel**: `CustomerId` (FK → `SalesLT.Customer`), `RewardsLevelId` (FK →
-  `Rewards.RewardsLevel`) — join table assigning each customer a rewards tier.
+**Rewards.RewardsLevel**
 
-None of the `SalesIntelligence`/`Rewards` tables have a Domain entity, Application DTO,
-repository, or controller yet. Building an endpoint over any of them is a brand-new vertical
-slice (see `.claude/agents/api-scaffolder.md`), and the resulting `DbContext` will span three
-schemas (`SalesLT`, `SalesIntelligence`, `Rewards`) with cross-schema foreign keys into
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `RewardsLevelId` | `int` | NO | PK, clustered, **IDENTITY** |
+| `RewardsLevelName` | `varchar(50)` | NO | |
+| `DiscountPercent` | `decimal(18,4)` | **YES** | needs a `DBNull` guard on read |
+
+Exactly three rows: **Gold = `0`**, Silver = `1`, Bronze = `2`.
+
+**Rewards.CustomerRewardsLevel**
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `CustomerId` | `int` | NO | **PK** (`PK_CustomerRewardsLevel`, clustered), FK → `SalesLT.Customer.CustomerID` |
+| `RewardsLevelId` | `int` | NO | FK → `Rewards.RewardsLevel.RewardsLevelId` |
+
+Two columns only — no surrogate key, no dates, no `ModifiedDate`. **Not** a many-to-many bridge
+despite the shape: the PK is on `CustomerId` alone, so a customer has **at most one** tier. See
+`docs/adr/0008-one-rewards-tier-per-customer.md` — that PK was added deliberately and is lost if
+this database is re-provisioned.
+
+### Gotchas
+
+- **Gold is `RewardsLevelId` `0`**, which collides with `default(int)`. Use `int?` in any DTO or
+  mapping so "no tier" is `null` and can never be confused with Gold. Gold also has **zero**
+  customers assigned today.
+- **`DiscountPercent` is a rate, not a percentage** — the values are `.0010`/`.0009`/`.0008`,
+  i.e. 0.1%/0.09%/0.08%. The column name says otherwise. Don't multiply by 100 assuming the name
+  is accurate, and don't "fix" the data assuming the values are wrong.
+- **295 of 847 customers have no tier row at all.** A customer with no tier is a normal state, not
+  an error — read with a `LEFT JOIN` from `SalesLT.Customer`, never an inner join.
+- `SalesLT.usp_GetCustomerByID` and `SalesLT.usp_GetCustomerBySearchTerm` already join these
+  tables and flatten `RewardsLevelName`/`DiscountPercent` onto the customer row. Neither is called
+  by application code, but they're the origin of the tier semantics this codebase follows.
+
+The `SalesIntelligence` tables still have no Domain entity, Application DTO, repository, or
+controller. Building an endpoint over any of them is a brand-new vertical slice (see
+`.claude/agents/api-scaffolder.md`), with cross-schema foreign keys into
 `SalesLT.Product`/`SalesLT.Customer`.
 
 ## dbo schema — housekeeping only, never part of the API surface

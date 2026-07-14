@@ -33,6 +33,7 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 | GET | `/api/v1/customers/{customerId}/summary` | — | `CustomerSummaryDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/recent-orders` | — | `CustomerOrderDto[]` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/order-summary` | — | `CustomerOrderSummaryDto` | `200`, `404` |
+| GET | `/api/v1/customers/{customerId}/rewards` | — | `CustomerRewardsDto` | `200`, `404` |
 
 ### DTO shapes (`Application/Customers/Dtos/`)
 
@@ -50,3 +51,9 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
   `mostRecentOrderDate?`.
 - **`CustomerOrderSummaryDto`**: `customerId`, `orderCount`, `subTotal`, `taxAmount`,
   `freightAmount`, `totalDue`, `firstOrderDate?`, `mostRecentOrderDate?`.
+- **`CustomerRewardsDto`**: `customerId` (int), `rewardsLevelId?` (int), `rewardsLevelName?`,
+  `discountPercent?` (decimal). **All three tier fields are null together** when the customer
+  exists but has no rewards tier assigned — 295 of 847 customers today. That's a `200`, not a
+  `404`; `404` means no such customer. `rewardsLevelId` is nullable rather than defaulting to `0`
+  because `0` is a real tier (Gold) — see `docs/database-schema.md`. Note `discountPercent` is a
+  rate (`0.0009` = 0.09%), not a percentage, despite the name.

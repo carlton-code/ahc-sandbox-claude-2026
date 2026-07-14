@@ -117,5 +117,13 @@ namespace AHC.Sandbox.Api.Controllers
 
             return summary is null ? NotFound() : Ok(summary);
         }
+
+        [HttpGet("{customerId:int}/rewards")]
+        public async Task<IActionResult> GetCustomerRewards(int customerId, CancellationToken cancellationToken)
+        {
+            var rewards = await _customerService.GetCustomerRewardsAsync(customerId, cancellationToken);
+
+            return rewards is null ? NotFound() : Ok(rewards);
+        }
     }
 }

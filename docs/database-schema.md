@@ -43,6 +43,28 @@ Order history queried for a customer's orders/summary endpoints.
 - **Touched by:** `CustomerReadRepository.GetOrdersByCustomerIdAsync` /
   `GetOrderByIdAsync` / `GetRecentOrdersAsync` / `GetOrderSummaryAsync`.
 
+### `Rewards.CustomerRewardsLevel` + `Rewards.RewardsLevel`
+
+The customer rewards-tier assignment, exposed by `GET /api/v1/customers/{id}/rewards`.
+
+- **Not EF-mapped** — read via one raw parameterized `LEFT JOIN` across both tables, in
+  `CustomerReadRepository.GetRewardsAsync`.
+- **Columns currently selected:** `CustomerRewardsLevel.CustomerId`/`RewardsLevelId`;
+  `RewardsLevel.RewardsLevelName`/`DiscountPercent`. That's every column both tables have.
+- **One tier per customer, enforced by `PK_CustomerRewardsLevel` on `CustomerId` alone** — added
+  by this project, see ADR-0008. It looks like a many-to-many bridge table but isn't. The PK is
+  lost if the database is re-provisioned; re-run the `ALTER TABLE` in the ADR.
+- **Known gotcha:** `Gold` is `RewardsLevelId` **`0`** — the same as `default(int)`. `CustomerRewardsDto`
+  uses `int?` so "no tier" is `null` rather than accidentally reading as Gold. Gold currently has
+  no customers assigned at all.
+- **Known gotcha:** `DiscountPercent` is `decimal(18,4)` valued `.0010`/`.0009`/`.0008` — those are
+  **rates** (0.1%), not percentages, despite the column name. The DTO keeps the database's name
+  rather than silently reinterpreting it.
+- **Known gotcha:** 295 of 847 customers have no tier row. That's a normal state, so the query
+  `LEFT JOIN`s from `SalesLT.Customer` — an inner join would make a third of customers look
+  nonexistent. `null` from the repository means "no such customer", never "no tier".
+- **Touched by:** `Data/Repositories/CustomerReadRepository.cs` (`GetRewardsAsync`).
+
 ## Not in use
 
 No entity, mapping, query, or controller exists for these — nothing here counts as "in use."
@@ -54,9 +76,8 @@ No entity, mapping, query, or controller exists for these — nothing here count
 - The rest of `SalesLT` — `ProductModel`, `ProductDescription`, `ProductModelProductDescription`,
   `SalesOrderDetail`, and the three catalog views (`vGetAllCategories`, `vProductAndDescription`,
   `vProductModelCatalogDescription`).
-- **`SalesIntelligence`** and **`Rewards`** — entirely unbuilt schemas (product bundles,
-  recommendations, a customer rewards-tier program). See the schema skill for the table shapes if
-  that work starts.
+- **`SalesIntelligence`** — an entirely unbuilt schema (product bundles, recommendations). See the
+  schema skill for the table shapes if that work starts. (`Rewards` is now in use — see above.)
 - `dbo` housekeeping tables (`BuildVersion`, `ErrorLog`, `sysdiagrams`) — never relevant to this
   API.
 

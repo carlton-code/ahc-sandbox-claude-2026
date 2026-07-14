@@ -223,6 +223,78 @@ public class CustomerReadRepository : ICustomerReadRepository
         }
     }
 
+    public async Task<CustomerRewardsDto?> GetRewardsAsync(
+        int customerId,
+        CancellationToken cancellationToken = default)
+    {
+        // Unlike GetOrderSummaryAsync, no separate existence probe is needed: this LEFT JOINs
+        // *from* SalesLT.Customer, so zero rows means the customer doesn't exist, while one row
+        // with null tier columns means the customer exists but has no tier assigned (about a
+        // third of customers). An aggregate can't make that distinction; this join can.
+        const string sql = """
+            SELECT
+                c.CustomerID,
+                crl.RewardsLevelId,
+                rl.RewardsLevelName,
+                rl.DiscountPercent
+            FROM SalesLT.Customer AS c
+                LEFT JOIN Rewards.CustomerRewardsLevel AS crl ON crl.CustomerId = c.CustomerID
+                LEFT JOIN Rewards.RewardsLevel AS rl ON rl.RewardsLevelId = crl.RewardsLevelId
+            WHERE c.CustomerID = @customerId;
+            """;
+
+        var connection = _dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+        if (shouldCloseConnection)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            AddParameter(command, "@customerId", customerId);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            var rewards = new CustomerRewardsDto
+            {
+                CustomerId = Convert.ToInt32(reader["CustomerID"]),
+                RewardsLevelId = reader["RewardsLevelId"] is DBNull ? null : Convert.ToInt32(reader["RewardsLevelId"]),
+                RewardsLevelName = reader["RewardsLevelName"] is DBNull ? null : Convert.ToString(reader["RewardsLevelName"]),
+                DiscountPercent = reader["DiscountPercent"] is DBNull ? null : Convert.ToDecimal(reader["DiscountPercent"])
+            };
+
+            // PK_CustomerRewardsLevel (ADR-0008) makes a second row impossible, so reaching here
+            // means that constraint is gone — most likely the database was re-provisioned from a
+            // fresh restore, which drops it. Throw rather than silently returning whichever tier
+            // the server happened to order first: a wrong tier is worse than a failed request.
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                throw new InvalidOperationException(
+                    $"Customer {customerId} has more than one rewards tier row, which " +
+                    "PK_CustomerRewardsLevel should prevent. The constraint is missing — see " +
+                    "docs/adr/0008-one-rewards-tier-per-customer.md to restore it.");
+            }
+
+            return rewards;
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
     private async Task<IReadOnlyCollection<CustomerOrderDto>> ExecuteOrderQueryAsync(
         string sql,
         Action<DbCommand> configureCommand,

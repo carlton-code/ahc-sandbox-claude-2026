@@ -29,6 +29,7 @@ Each ADR follows the same shape (see `template.md`):
 | [0005](0005-split-unit-and-integration-test-projects.md) | Split test projects into `UnitTests` and `IntegrationTests` |
 | [0006](0006-dtos-as-the-api-boundary.md) | DTOs as the API boundary, never entities |
 | [0007](0007-drop-password-columns-from-customer.md) | Drop `PasswordHash`/`PasswordSalt` from `SalesLT.Customer` |
+| [0008](0008-one-rewards-tier-per-customer.md) | Enforce one rewards tier per customer at the schema level |
 
 ## Adding a new ADR
 
