@@ -3,9 +3,9 @@
 ## Purpose
 
 The `AHC.Sandbox.IntegrationTests` project contains tests that need real infrastructure to mean
-anything — a real SQL Server against the AdventureWorksLT database, eventually a real Redis
-instance, and/or a running `Api` host. It's the counterpart to `AHC.Sandbox.UnitTests`, which
-covers `Domain`/`Application` logic in isolation with fakes.
+anything — a real SQL Server against the AdventureWorksLT database, a real Redis instance, and/or
+a running `Api` host. It's the counterpart to `AHC.Sandbox.UnitTests`, which covers
+`Domain`/`Application` logic in isolation with fakes.
 
 **Current state:** this project has a checked-in `appsettings.json` (`ConnectionStrings:AdventureWorksLt`
 plus a `Redis` section) copied to the output directory, and `Infrastructure/TestConfiguration.cs`,

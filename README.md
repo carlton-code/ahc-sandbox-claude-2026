@@ -71,8 +71,8 @@ dotnet build
 dotnet run --project src/AHC.Sandbox.Api
 ```
 
-In Development, Swagger UI is available at `/openapi/v1.json` via the running host. Tests use
-NUnit:
+In Development, Swagger UI is available at `/swagger` on the running host, backed by the
+generated OpenAPI document at `/openapi/v1.json`. Tests use NUnit:
 
 ```
 dotnet test
