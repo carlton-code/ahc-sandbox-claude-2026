@@ -1,6 +1,7 @@
 using AHC.Sandbox.Application.Customers.Dtos;
 using AHC.Sandbox.Application.Customers.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace AHC.Sandbox.Api.Controllers
 {
@@ -48,6 +49,28 @@ namespace AHC.Sandbox.Api.Controllers
             var customer = await _customerService.GetCustomerByIdAsync(customerId, cancellationToken);
 
             return customer is null ? NotFound() : Ok(customer);
+        }
+
+        /// <summary>
+        /// Finds customers by first name, last name, or both separated by a space.
+        /// </summary>
+        /// <param name="q">
+        /// Required. Matched as a case-insensitive substring. <c>[Required]</c> covers missing,
+        /// empty, and whitespace-only values on its own — the model binder converts a
+        /// whitespace-only query value to null before validation runs — so <c>[ApiController]</c>
+        /// returns a 400 before this action body executes. No hand-rolled guard is needed; one
+        /// would be unreachable.
+        /// </param>
+        [HttpGet("search")]
+        [ProducesResponseType<IReadOnlyCollection<CustomerDto>>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<IReadOnlyCollection<CustomerDto>>> SearchCustomers(
+            [FromQuery][Required] string q,
+            CancellationToken cancellationToken)
+        {
+            var customers = await _customerService.SearchCustomersAsync(q, cancellationToken);
+
+            return Ok(customers);
         }
 
         [HttpPost]

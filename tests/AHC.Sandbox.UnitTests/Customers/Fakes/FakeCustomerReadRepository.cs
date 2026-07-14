@@ -13,10 +13,12 @@ namespace AHC.Sandbox.UnitTests.Customers.Fakes
 
         public IReadOnlyCollection<CustomerOrderDto> OrdersToReturn { get; set; } = Array.Empty<CustomerOrderDto>();
         public IReadOnlyCollection<CustomerOrderDto> RecentOrdersToReturn { get; set; } = Array.Empty<CustomerOrderDto>();
+        public IReadOnlyCollection<Customer> SearchResultsToReturn { get; set; } = Array.Empty<Customer>();
 
         public int GetByIdAsyncCallCount { get; private set; }
         public bool GetOrdersByCustomerIdAsyncCalled { get; private set; }
         public bool GetRecentOrdersAsyncCalled { get; private set; }
+        public string? LastSearchTerm { get; private set; }
 
         public Task<IReadOnlyCollection<Customer>> GetAllAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyCollection<Customer>>(Customers);
@@ -25,6 +27,14 @@ namespace AHC.Sandbox.UnitTests.Customers.Fakes
         {
             GetByIdAsyncCallCount++;
             return Task.FromResult(Customers.FirstOrDefault(c => c.CustomerId == customerId));
+        }
+
+        // Records the term rather than matching on it: the real matching is SQL, so it's proven in
+        // the integration tests, not faked here.
+        public Task<IReadOnlyCollection<Customer>> SearchByNameAsync(string searchTerm, CancellationToken cancellationToken = default)
+        {
+            LastSearchTerm = searchTerm;
+            return Task.FromResult(SearchResultsToReturn);
         }
 
         public Task<IReadOnlyCollection<CustomerOrderDto>> GetOrdersByCustomerIdAsync(int customerId, CancellationToken cancellationToken = default)

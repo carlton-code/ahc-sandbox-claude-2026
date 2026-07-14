@@ -11,6 +11,8 @@ namespace AHC.Sandbox.Data.Repositories;
 
 public class CustomerReadRepository : ICustomerReadRepository
 {
+    private const string LikeEscapeCharacter = "\\";
+
     private readonly AdventureWorksLtDbContext _dbContext;
 
     public CustomerReadRepository(AdventureWorksLtDbContext dbContext)
@@ -22,8 +24,11 @@ public class CustomerReadRepository : ICustomerReadRepository
     {
         var entities = await _dbContext.Customers
             .AsNoTracking()
+            // See SearchByNameAsync: (LastName, FirstName) isn't unique for 812 of 847 customers,
+            // so CustomerId is what makes this ordering deterministic rather than incidental.
             .OrderBy(c => c.LastName)
             .ThenBy(c => c.FirstName)
+            .ThenBy(c => c.CustomerId)
             .ToArrayAsync(cancellationToken);
 
         return entities
@@ -38,6 +43,54 @@ public class CustomerReadRepository : ICustomerReadRepository
             .FirstOrDefaultAsync(c => c.CustomerId == customerId, cancellationToken);
 
         return entity is null ? null : MapCustomer(entity);
+    }
+
+    /// <summary>
+    /// Matches <paramref name="searchTerm"/> against a first name, a last name, or both separated
+    /// by a space.
+    /// </summary>
+    /// <remarks>
+    /// The term is deliberately never split into first/last parts. This data makes that
+    /// unworkable: nine last names contain a space (e.g. "Van Houten"), so splitting
+    /// "Roger Van Houten" on the first space searches for the surname "Van" and finds nothing,
+    /// while splitting from the right breaks the six first names that contain a space (e.g.
+    /// "Janaina Barreiro Gambaro"). There's also no FullName column to match against — it's
+    /// computed on <see cref="Customer"/>. So the whole term is matched against the two full-name
+    /// concatenations, which covers all three input shapes without having to guess where the
+    /// boundary is.
+    /// <para>
+    /// Matching FirstName and LastName individually would be redundant: because this is a
+    /// substring match, FirstName is a prefix and LastName a suffix of "FirstName LastName", so
+    /// any term found in either is necessarily found in the concatenation. Both concatenations are
+    /// needed though — "Orlando Gee" matches the first but not the second (his middle name is
+    /// "N."), while a term spanning the middle name matches only the second.
+    /// </para>
+    /// </remarks>
+    public async Task<IReadOnlyCollection<Customer>> SearchByNameAsync(
+        string searchTerm,
+        CancellationToken cancellationToken = default)
+    {
+        var pattern = $"%{EscapeLikeWildcards(searchTerm.Trim())}%";
+
+        var entities = await _dbContext.Customers
+            .AsNoTracking()
+            .Where(c =>
+                EF.Functions.Like(c.FirstName + " " + c.LastName, pattern, LikeEscapeCharacter) ||
+                EF.Functions.Like(
+                    c.FirstName + " " + (c.MiddleName == null ? "" : c.MiddleName + " ") + c.LastName,
+                    pattern,
+                    LikeEscapeCharacter))
+            // CustomerId breaks ties: 812 of 847 customers share a (LastName, FirstName) with
+            // someone else, so without it the order of those rows is whatever the query plan
+            // happens to emit — not a contract, and not something a test can honestly assert.
+            .OrderBy(c => c.LastName)
+            .ThenBy(c => c.FirstName)
+            .ThenBy(c => c.CustomerId)
+            .ToArrayAsync(cancellationToken);
+
+        return entities
+            .Select(MapCustomer)
+            .ToArray();
     }
 
     public Task<IReadOnlyCollection<CustomerOrderDto>> GetOrdersByCustomerIdAsync(
@@ -344,6 +397,16 @@ public class CustomerReadRepository : ICustomerReadRepository
             }
         }
     }
+
+    // Without this, LIKE metacharacters in caller-supplied input act as wildcards rather than
+    // literals — a search for "%" would match every customer instead of none. No name in the
+    // database contains one, so this exists purely to keep untrusted input from being read as a
+    // pattern.
+    private static string EscapeLikeWildcards(string term) => term
+        .Replace(LikeEscapeCharacter, LikeEscapeCharacter + LikeEscapeCharacter)  // must come first
+        .Replace("%", LikeEscapeCharacter + "%")
+        .Replace("_", LikeEscapeCharacter + "_")
+        .Replace("[", LikeEscapeCharacter + "[");
 
     private static void AddParameter(DbCommand command, string name, object value)
     {
