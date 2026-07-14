@@ -193,6 +193,21 @@ public class CustomerReadRepositoryTests
         Assert.That(summary.MostRecentOrderDate, Is.EqualTo(new DateTime(2008, 6, 1)));
     }
 
+    // Same distinction as GetOrderSummaryAsync_CustomerWithNoOrders_ReturnsZeroedSummaryNotNull:
+    // a customer with no orders still has a summary (their details, zeroed totals), and only an
+    // unknown customer is null. Here the zeros come from GetSummaryAsync's own `?? 0` folding.
+    [Test]
+    public async Task GetSummaryAsync_CustomerWithNoOrders_ReturnsCustomerWithZeroedTotals()
+    {
+        var summary = await _repository.GetSummaryAsync(KnownCustomerIdWithoutOrders);
+
+        Assert.That(summary, Is.Not.Null);
+        Assert.That(summary!.Customer.CustomerId, Is.EqualTo(KnownCustomerIdWithoutOrders));
+        Assert.That(summary.OrderCount, Is.EqualTo(0));
+        Assert.That(summary.TotalOrderValue, Is.EqualTo(0m));
+        Assert.That(summary.MostRecentOrderDate, Is.Null);
+    }
+
     [Test]
     public async Task GetSummaryAsync_UnknownCustomer_ReturnsNull()
     {
@@ -240,6 +255,28 @@ public class CustomerReadRepositoryTests
         Assert.That(summary.TotalDue, Is.EqualTo(43962.7901m));
         Assert.That(summary.FirstOrderDate, Is.EqualTo(new DateTime(2008, 6, 1)));
         Assert.That(summary.MostRecentOrderDate, Is.EqualTo(new DateTime(2008, 6, 1)));
+    }
+
+    // The dominant case — 815 of 847 customers have no orders — and the one the other two tests
+    // don't distinguish between. A customer with no orders is not the same as no such customer:
+    // this returns a zeroed summary, while GetOrderSummaryAsync_UnknownCustomer_ReturnsNull below
+    // returns null (which the controller turns into a 404). The zeros come from the query's
+    // COALESCE(SUM(...), 0) and the null dates from MIN/MAX over no rows; the AnyAsync existence
+    // probe is what keeps the two cases apart, since the aggregate itself always returns one row.
+    [Test]
+    public async Task GetOrderSummaryAsync_CustomerWithNoOrders_ReturnsZeroedSummaryNotNull()
+    {
+        var summary = await _repository.GetOrderSummaryAsync(KnownCustomerIdWithoutOrders);
+
+        Assert.That(summary, Is.Not.Null);
+        Assert.That(summary!.CustomerId, Is.EqualTo(KnownCustomerIdWithoutOrders));
+        Assert.That(summary.OrderCount, Is.EqualTo(0));
+        Assert.That(summary.SubTotal, Is.EqualTo(0m));
+        Assert.That(summary.TaxAmount, Is.EqualTo(0m));
+        Assert.That(summary.FreightAmount, Is.EqualTo(0m));
+        Assert.That(summary.TotalDue, Is.EqualTo(0m));
+        Assert.That(summary.FirstOrderDate, Is.Null);
+        Assert.That(summary.MostRecentOrderDate, Is.Null);
     }
 
     [Test]
