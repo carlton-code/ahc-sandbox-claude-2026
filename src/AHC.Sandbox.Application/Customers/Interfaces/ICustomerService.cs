@@ -21,5 +21,6 @@ namespace AHC.Sandbox.Application.Customers.Interfaces
         Task<CustomerSummaryDto?> GetCustomerSummaryAsync(int customerId, CancellationToken cancellationToken = default);
         Task<IReadOnlyCollection<CustomerOrderDto>?> GetCustomerRecentOrdersAsync(int customerId, CancellationToken cancellationToken = default);
         Task<CustomerOrderSummaryDto?> GetCustomerOrderSummaryAsync(int customerId, CancellationToken cancellationToken = default);
+        Task<CustomerRewardsDto?> GetCustomerRewardsAsync(int customerId, CancellationToken cancellationToken = default);
     }
 }

@@ -168,6 +168,11 @@ namespace AHC.Sandbox.Application.Customers.Services
             return _customerReadRepository.GetOrderSummaryAsync(customerId, cancellationToken);
         }
 
+        public Task<CustomerRewardsDto?> GetCustomerRewardsAsync(int customerId, CancellationToken cancellationToken = default)
+        {
+            return _customerReadRepository.GetRewardsAsync(customerId, cancellationToken);
+        }
+
         private async Task<(bool CacheAvailable, CustomerDto? Customer)> TryGetCachedCustomerAsync(int customerId, CancellationToken cancellationToken)
         {
             try

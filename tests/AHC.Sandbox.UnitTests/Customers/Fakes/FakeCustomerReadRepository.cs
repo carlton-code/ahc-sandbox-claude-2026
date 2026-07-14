@@ -47,5 +47,8 @@ namespace AHC.Sandbox.UnitTests.Customers.Fakes
 
         public Task<CustomerOrderSummaryDto?> GetOrderSummaryAsync(int customerId, CancellationToken cancellationToken = default)
             => Task.FromResult<CustomerOrderSummaryDto?>(null);
+
+        public Task<CustomerRewardsDto?> GetRewardsAsync(int customerId, CancellationToken cancellationToken = default)
+            => Task.FromResult<CustomerRewardsDto?>(null);
     }
 }

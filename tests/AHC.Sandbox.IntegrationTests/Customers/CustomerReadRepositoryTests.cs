@@ -11,11 +11,14 @@ namespace AHC.Sandbox.IntegrationTests.Customers;
 ///
 /// Known seed data this file relies on (see <c>ReadMe-IntegrationTests.md</c> /
 /// <c>docs/database-schema.md</c> for how to re-derive these if the local database changes):
-/// - CustomerID 1 (Orlando Gee) exists and has no orders.
+/// - CustomerID 1 (Orlando Gee) exists and has no orders, and has no Rewards tier assigned.
 /// - CustomerID 29485 exists and has exactly one order: SalesOrderID 71782 (SO71782).
 /// - SalesOrderID 71774 belongs to a different customer (29847), giving a customer/order
 ///   mismatch pair.
 /// - CustomerID 999999 is unknown (max CustomerID in the seed data is 30118).
+/// - CustomerID 3 is assigned Rewards tier Silver (RewardsLevelId 1, DiscountPercent 0.0009).
+///   Rewards.RewardsLevel holds exactly three tiers: Gold (0), Silver (1), Bronze (2). 552 of
+///   847 customers have a tier; the other 295 have none, so both branches are real seed states.
 /// </summary>
 public class CustomerReadRepositoryTests
 {
@@ -24,6 +27,8 @@ public class CustomerReadRepositoryTests
     private const int KnownOrderId = 71782;
     private const int MismatchedOrderId = 71774;
     private const int UnknownCustomerId = 999999;
+    private const int KnownCustomerIdWithRewardsTier = 3;
+    private const int KnownCustomerIdWithoutRewardsTier = 1;
 
     private AdventureWorksLtDbContext _dbContext = null!;
     private CustomerReadRepository _repository = null!;
@@ -231,5 +236,41 @@ public class CustomerReadRepositoryTests
         var summary = await _repository.GetOrderSummaryAsync(UnknownCustomerId);
 
         Assert.That(summary, Is.Null);
+    }
+
+    // --- GetRewardsAsync -----------------------------------------------------------------------
+
+    [Test]
+    public async Task GetRewardsAsync_CustomerWithTier_ReturnsTier()
+    {
+        var rewards = await _repository.GetRewardsAsync(KnownCustomerIdWithRewardsTier);
+
+        Assert.That(rewards, Is.Not.Null);
+        Assert.That(rewards!.CustomerId, Is.EqualTo(KnownCustomerIdWithRewardsTier));
+        Assert.That(rewards.RewardsLevelId, Is.EqualTo(1));
+        Assert.That(rewards.RewardsLevelName, Is.EqualTo("Silver"));
+        Assert.That(rewards.DiscountPercent, Is.EqualTo(0.0009m));
+    }
+
+    // The 35%-of-customers case, and the whole reason the query LEFT JOINs from SalesLT.Customer:
+    // an unenrolled customer must still come back as a customer, not as a 404.
+    [Test]
+    public async Task GetRewardsAsync_CustomerWithoutTier_ReturnsDtoWithNullTier()
+    {
+        var rewards = await _repository.GetRewardsAsync(KnownCustomerIdWithoutRewardsTier);
+
+        Assert.That(rewards, Is.Not.Null);
+        Assert.That(rewards!.CustomerId, Is.EqualTo(KnownCustomerIdWithoutRewardsTier));
+        Assert.That(rewards.RewardsLevelId, Is.Null);
+        Assert.That(rewards.RewardsLevelName, Is.Null);
+        Assert.That(rewards.DiscountPercent, Is.Null);
+    }
+
+    [Test]
+    public async Task GetRewardsAsync_UnknownCustomer_ReturnsNull()
+    {
+        var rewards = await _repository.GetRewardsAsync(UnknownCustomerId);
+
+        Assert.That(rewards, Is.Null);
     }
 }
