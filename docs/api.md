@@ -10,6 +10,11 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 
 - Base route: `api/v1/<resource>` (see each controller's `[Route("api/v1/[controller]")]`).
 - All request/response bodies are JSON.
+- Every status code below is declared on the action via `[ProducesResponseType]`, so the live
+  OpenAPI document carries the same routes, status codes, and response schemas this file
+  describes — the two are cross-checkable rather than this file being the only record.
+- A `404` returns an RFC 9110 `ProblemDetails` body (produced automatically by `[ApiController]`),
+  not an empty response.
 - No authentication/authorization is configured yet — every endpoint below is open (see
   `docs/adr/` if an ADR exists for when that changes, or `ReadMe-Api.md` for the current gap).
 - No model-validation attributes (`[Required]`, etc.) are present on any DTO today, so the

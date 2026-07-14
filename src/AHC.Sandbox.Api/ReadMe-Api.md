@@ -40,6 +40,11 @@ The API layer should:
 - Route pattern: `[Route("api/v1/[controller]")]`.
 - Status codes: `NotFound()` when a nullable lookup returns `null`; `NoContent()` on a successful
   mutation; `NotFound()` on a mutation whose target doesn't exist; `CreatedAtAction` on `POST`.
+- Actions with a response body return `ActionResult<T>`; body-less ones (`PUT`/`DELETE`) return
+  `IActionResult`.
+- Every status an action can return is declared with `[ProducesResponseType]`, **including the
+  success one** — adding any such attribute replaces the framework's inferred `200` instead of
+  adding to it, so a partially-annotated action documents its `404` and silently loses its `200`.
 - See `CustomersController` for the reference implementation of all of the above.
 
 ## Dependencies
