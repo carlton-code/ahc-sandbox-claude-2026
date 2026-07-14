@@ -103,7 +103,8 @@ CQRS-flavored convention (not full CQRS — no separate event store or message b
 - `.claude/agents/architecture-reviewer.md` — actively checks a diff against the dependency rule
   and these conventions.
 - `.claude/agents/api-scaffolder.md` — builds new vertical slices following this layering.
-- `.claude/agents/redis-cache-builder.md` — the current live example of identifying and fixing a
-  layering violation.
+- `.claude/agents/redis-cache-builder.md` — the reasoning behind the `Customer` cache's
+  port-in-`Application`/adapter-in-`Infrastructure` shape, and the pattern to follow when
+  extending caching to another resource.
 - Each project's own `ReadMe-<Project>.md` — the most detailed, project-specific version of
   "what belongs here."

@@ -28,7 +28,7 @@ from-scratch build. What exists today:
   translation (a deserialization failure is deliberately left to propagate).
 - `Infrastructure/Infrastructure.csproj` — references `StackExchange.Redis`.
 - `Redis` sections exist in both `appsettings.json` and `appsettings.Development.json`.
-- `Infrastructure/DependencyInjection.cs` — `AddInfrastructure()` registers `IConnectionMultiplexer`
+- `Infrastructure/DependencyInjection.cs` — `AddInfrastructure(IConfiguration)` registers `IConnectionMultiplexer`
   (singleton, `AbortOnConnectFail = false`) and `ICustomerCacheRepository` (scoped).
 - `CustomerService` already consumes the cache (cache-aside on `GetCustomerByIdAsync`,
   invalidate-on-write on update/patch/delete), with tests: `CustomerServiceTests` +
@@ -77,13 +77,13 @@ reference `StackExchange.Redis` or the concrete repository directly.
    and silently never caches. This validates *configuration*, not Redis *reachability*:
    `AbortOnConnectFail = false` still lets a configured-but-unreachable Redis degrade gracefully.
 
-5. **Add the missing `Redis` section** to `appsettings.Development.json` (e.g.
-   `"Configuration": "localhost:6379", "UseTls": false`). *Why:* `UseTls` should be `false` for a
+5. **Give each environment its own `Redis` section** — `appsettings.Development.json` already has
+   one (`"Configuration": "localhost:6379", "UseTls": false`). *Why:* `UseTls` should be `false` for a
    local dev Redis instance — TLS is normally only relevant for a managed/cloud Redis endpoint,
    and forcing it locally is a common source of "why won't this connect" confusion.
 
-6. **Design `ICustomerCacheRepository`'s contract deliberately** — something like
-   `Task<CustomerDto?> GetAsync(int customerId, CancellationToken ct)`,
+6. **Design `ICustomerCacheRepository`'s contract deliberately** — as built, that's
+   `Task<CustomerDto?> GetByIdAsync(int customerId, CancellationToken ct)`,
    `Task SetAsync(int customerId, CustomerDto customer, CancellationToken ct)`,
    `Task RemoveAsync(int customerId, CancellationToken ct)`. *Why:* keep it Customer-specific for
    now rather than inventing a generic `ICacheRepository<T>` — there's only one cache consumer so
@@ -103,9 +103,10 @@ reference `StackExchange.Redis` or the concrete repository directly.
 
 9. **Wire the cache into `CustomerService` using cache-aside**, not into the controller or the
    read repository. On `GetCustomerByIdAsync`: check cache → on miss, read from
-   `ICustomerReadRepository` → populate cache → return. On any mutation
-   (`CreateCustomerAsync`/`UpdateCustomerAsync`/`PatchCustomerAsync`/`DeleteCustomerAsync`):
-   **invalidate** (remove) the key rather than trying to update the cached value in place. *Why:*
+   `ICustomerReadRepository` → populate cache → return. On any mutation of an *existing* row
+   (`UpdateCustomerAsync`/`PatchCustomerAsync`/`DeleteCustomerAsync`): **invalidate** (remove) the
+   key rather than trying to update the cached value in place. `CreateCustomerAsync` does no cache
+   work — a brand-new id can't have a stale entry to invalidate. *Why:*
    invalidate-on-write is simpler and far less error-prone than keeping a cached copy manually in
    sync with every mutation path — a missed update site is a silent staleness bug, a missed
    invalidation is at least easy to reason about (worst case, one extra cache miss).
