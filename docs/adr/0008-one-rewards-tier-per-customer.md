@@ -50,8 +50,10 @@ enforces at most one tier per customer.
 ## Consequences
 
 - The invariant the code relies on is now enforced where it belongs, so
-  `CustomerReadRepository.GetRewardsAsync` can read a single tier without a defensive `TOP 1` and
-  without the risk of silently picking an arbitrary row.
+  `CustomerReadRepository.GetRewardsAsync` can read a single tier without a defensive `TOP 1`.
+  It does still check for a second row and throw an `InvalidOperationException` naming this ADR
+  if it finds one — not because the constraint is expected to fail, but because the failure mode
+  if it's ever missing (silently returning an arbitrary tier) is worse than a loud error.
 - The two existing stored procedures are protected from the duplicate-customer-row bug described
   above. This ADR fixes latent database code, not just new application code.
 - The table converts from a heap to a clustered index on `CustomerId`, which is the lookup

@@ -264,13 +264,27 @@ public class CustomerReadRepository : ICustomerReadRepository
                 return null;
             }
 
-            return new CustomerRewardsDto
+            var rewards = new CustomerRewardsDto
             {
                 CustomerId = Convert.ToInt32(reader["CustomerID"]),
                 RewardsLevelId = reader["RewardsLevelId"] is DBNull ? null : Convert.ToInt32(reader["RewardsLevelId"]),
                 RewardsLevelName = reader["RewardsLevelName"] is DBNull ? null : Convert.ToString(reader["RewardsLevelName"]),
                 DiscountPercent = reader["DiscountPercent"] is DBNull ? null : Convert.ToDecimal(reader["DiscountPercent"])
             };
+
+            // PK_CustomerRewardsLevel (ADR-0008) makes a second row impossible, so reaching here
+            // means that constraint is gone — most likely the database was re-provisioned from a
+            // fresh restore, which drops it. Throw rather than silently returning whichever tier
+            // the server happened to order first: a wrong tier is worse than a failed request.
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                throw new InvalidOperationException(
+                    $"Customer {customerId} has more than one rewards tier row, which " +
+                    "PK_CustomerRewardsLevel should prevent. The constraint is missing — see " +
+                    "docs/adr/0008-one-rewards-tier-per-customer.md to restore it.");
+            }
+
+            return rewards;
         }
         finally
         {
