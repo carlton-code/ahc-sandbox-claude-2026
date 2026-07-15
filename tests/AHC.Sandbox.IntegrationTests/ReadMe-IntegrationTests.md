@@ -77,8 +77,9 @@ Code that belongs here:
   against the real database, each test cleaning up its own throwaway row.
 - `Addresses/AddressReadRepositoryTests.cs` — `AddressReadRepository`'s customer-scoped address
   reads (ordering, field mapping, cross-customer scoping) against the real database.
-- `Caching/RedisCustomerCacheRepositoryTests.cs` — `RedisCustomerCacheRepository` against the real
-  `local-redis` container, including the cache-unavailable → `CacheUnavailableException` path.
+- `Caching/RedisCustomerCacheRepositoryTests.cs` — `RedisCustomerCacheRepository` against a real
+  local Redis instance (`localhost:6379`, per this project's `appsettings.json`), including the
+  cache-unavailable → `CacheUnavailableException` path.
 - End-to-end controller tests via `WebApplicationFactory<Program>`, if/when that's worth the setup.
 
 ## Goal
