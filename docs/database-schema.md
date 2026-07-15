@@ -65,12 +65,39 @@ The customer rewards-tier assignment, exposed by `GET /api/v1/customers/{id}/rew
   nonexistent. `null` from the repository means "no such customer", never "no tier".
 - **Touched by:** `Data/Repositories/CustomerReadRepository.cs` (`GetRewardsAsync`).
 
+### `SalesLT.Address` + `SalesLT.CustomerAddress`
+
+A customer's addresses, exposed by `GET /api/v1/customers/{id}/addresses` and
+`GET /api/v1/customers/{id}/addresses/{addressId}`.
+
+- **EF-mapped** by `AddressEntity`/`CustomerAddressEntity` + Fluent API config in
+  `Data/Context/AdventureWorksLtDbContext.cs`, read with plain LINQ. Mapped rather than read raw
+  precisely because `ef-core-conventions.md` says to prefer mapping a new table over adding
+  another raw query — the raw SQL elsewhere in this layer exists only for *unmapped* tables.
+- **Columns currently mapped:** `Address.AddressID`/`AddressLine1`/`AddressLine2`/`City`/
+  `StateProvince`/`CountryRegion`/`PostalCode`, and `CustomerAddress.CustomerID`/`AddressID`/
+  `AddressType`. `rowguid`/`ModifiedDate` on both tables are deliberately unmapped.
+- **Safe to leave `rowguid`/`ModifiedDate` unmapped**, unlike ADR-0007's password columns: both are
+  `NOT NULL` but both have database defaults (`newid()`/`getdate()`), so their absence can't break
+  an insert if writes are ever added.
+- **Known gotcha:** `StateProvince`, `CountryRegion` and `AddressType` are the `Name` **alias type**
+  in this database, not `nvarchar` directly. EF maps them fine as the underlying `nvarchar(50)`.
+- **Known gotcha:** **440 of 847 customers have no address at all** — an empty list is the majority
+  state, not an error. The API returns `200 []` for it and reserves `404` for a customer that
+  doesn't exist, which is why `AddressService` probes the customer before querying addresses.
+- **Known gotcha:** `AddressType` is only ever `Main Office` (407 rows) or `Shipping` (10). The 10
+  customers with two addresses have one of each — which is why the read orders by `AddressType`
+  then `AddressID` rather than by id alone.
+- **`SalesOrderHeader.ShipToAddressID`/`BillToAddressID` also FK onto `Address`.** Irrelevant to
+  these read-only endpoints, but it means a future hard `DELETE` of an address can violate a
+  constraint.
+- **Touched by:** `Data/Repositories/AddressReadRepository.cs`.
+
 ## Not in use
 
 No entity, mapping, query, or controller exists for these — nothing here counts as "in use."
 
-- **`SalesLT.Address`**, **`SalesLT.CustomerAddress`**, **`SalesLT.ProductCategory`** — no code
-  references these.
+- **`SalesLT.ProductCategory`** — no code references this.
 - **`SalesLT.Product`** — no code references this. Has a non-standard column, `CurrentDiscount`,
   not in the public sample.
 - The rest of `SalesLT` — `ProductModel`, `ProductDescription`, `ProductModelProductDescription`,

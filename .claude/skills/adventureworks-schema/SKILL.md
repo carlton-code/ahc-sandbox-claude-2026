@@ -27,10 +27,11 @@ JOIN INFORMATION_SCHEMA.COLUMNS c
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME, c.ORDINAL_POSITION;
 ```
 
-Already mapped in this codebase: `SalesLT.Customer` (see
-`Data/Context/AdventureWorksLtDbContext.cs` for the authoritative Fluent API mapping — that's a
-better source of truth than this file for the columns it covers) and read via raw SQL:
-`SalesLT.SalesOrderHeader` (see `CustomerReadRepository.cs`).
+Already mapped in this codebase: `SalesLT.Customer`, `SalesLT.Address` and
+`SalesLT.CustomerAddress` (see `Data/Context/AdventureWorksLtDbContext.cs` for the authoritative
+Fluent API mapping — that's a better source of truth than this file for the columns it covers).
+Read via raw SQL instead, because they're unmapped: `SalesLT.SalesOrderHeader` and the two
+`Rewards` tables (see `CustomerReadRepository.cs`).
 
 ## SalesLT schema
 
@@ -62,31 +63,51 @@ expecting a public-sample match.
 materialization. Worth flagging rather than silently "fixing" if noticed while scaffolding nearby
 code.
 
-### SalesLT.Address — not used by any code
+### SalesLT.Address — mapped (`AddressEntity`)
 
 | Column | Type | Nullable |
 |---|---|---|
-| AddressID (PK) | int | NO |
+| AddressID (PK, **IDENTITY**) | int | NO |
 | AddressLine1 | nvarchar(60) | NO |
 | AddressLine2 | nvarchar(60) | YES |
 | City | nvarchar(30) | NO |
 | StateProvince | nvarchar(50) | NO |
 | CountryRegion | nvarchar(50) | NO |
 | PostalCode | nvarchar(15) | NO |
-| rowguid | uniqueidentifier | NO |
-| ModifiedDate | datetime | NO |
+| rowguid | uniqueidentifier | NO (default `newid()`) |
+| ModifiedDate | datetime | NO (default `getdate()`) |
 
-### SalesLT.CustomerAddress — not used by any code
+`StateProvince`/`CountryRegion` are the `Name` **alias type** over `nvarchar(50)`, not `nvarchar`
+directly — EF maps them as the underlying type. `AddressLine2` is the only nullable text column.
+
+### SalesLT.CustomerAddress — mapped (`CustomerAddressEntity`)
 
 | Column | Type | Nullable |
 |---|---|---|
 | CustomerID (PK, FK → Customer) | int | NO |
 | AddressID (PK, FK → Address) | int | NO |
-| AddressType | nvarchar(50) | NO |
-| rowguid | uniqueidentifier | NO |
-| ModifiedDate | datetime | NO |
+| AddressType | nvarchar(50) (`Name` alias type) | NO |
+| rowguid | uniqueidentifier | NO (default `newid()`) |
+| ModifiedDate | datetime | NO (default `getdate()`) |
 
-Composite PK (`CustomerID`, `AddressID`) — map with `HasKey(e => new { e.CustomerId, e.AddressId })`.
+Composite PK (`CustomerID`, `AddressID`) — mapped with
+`HasKey(e => new { e.CustomerId, e.AddressId })`.
+
+Both tables are read with plain LINQ via `Data/Repositories/AddressReadRepository.cs`, behind
+`GET /api/v1/customers/{id}/addresses`. `rowguid`/`ModifiedDate` are unmapped on both — safe,
+because both have database defaults (unlike ADR-0007's password columns).
+
+**Gotchas:**
+
+- **440 of 847 customers have no address at all** (only 407 do). An empty list is the normal
+  majority case — `200 []`, not a 404.
+- `AddressType` is only ever **`Main Office`** (407 rows) or **`Shipping`** (10). The 10 customers
+  with two addresses have exactly one of each.
+- No address is linked to more than one customer today, but nothing enforces that — don't map it
+  as a 1:1.
+- 450 `Address` rows vs 417 `CustomerAddress` links: **33 addresses belong to no customer**,
+  reachable only through `SalesOrderHeader.ShipToAddressID`/`BillToAddressID`, which also FK onto
+  this table. That blocks a future hard `DELETE` of an address.
 
 ### SalesLT.Product — not used by any code
 
