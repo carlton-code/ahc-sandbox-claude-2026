@@ -14,9 +14,10 @@ paths:
 
 ## Current state
 
-`Customer` (`Entities/Customer.cs`) is the only entity today, and it's intentionally simple —
-plain properties plus one computed property (`FullName`). There's no other business logic here
-yet because nothing built so far has needed it.
+`Customer` (`Entities/Customer.cs`) and `Address` (`Entities/Address.cs`) are the only entities
+today, and both are intentionally simple — plain properties plus one computed property each
+(`FullName`, `SingleLineAddress`). There's no other business logic here yet because nothing built
+so far has needed it.
 
 As soon as a real business rule shows up (rewards-tier eligibility, order/bundle validation,
 etc.), it belongs on the relevant domain entity or a domain service — not bolted onto an
@@ -26,5 +27,6 @@ more than it looks like it does right now.
 
 ## Reference
 
-`Entities/Customer.cs` is the current example of everything this layer should look like: plain
-properties, one computed property, zero framework attributes or dependencies.
+`Entities/Customer.cs` and `Entities/Address.cs` are the current examples of everything this
+layer should look like: plain properties, one computed property, zero framework attributes or
+dependencies.

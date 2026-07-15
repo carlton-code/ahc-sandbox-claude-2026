@@ -11,8 +11,8 @@ a running `Api` host. It's the counterpart to `AHC.Sandbox.UnitTests`, which cov
 plus a `Redis` section) copied to the output directory, and `Infrastructure/TestConfiguration.cs`,
 `Infrastructure/DbContextTestFactory.cs`, and `Infrastructure/RedisTestFixture.cs` load it into a
 real `AdventureWorksLtDbContext` / `IConnectionMultiplexer` the same way `AHC.Sandbox.Data`'s
-`AddData` and `AHC.Sandbox.Infrastructure`'s `AddInfrastructure` do, minus DI. `Customers/` and
-`Caching/` contain the real tests built on top of those fixtures. There is no
+`AddData` and `AHC.Sandbox.Infrastructure`'s `AddInfrastructure` do, minus DI. `Customers/`,
+`Addresses/`, and `Caching/` contain the real tests built on top of those fixtures. There is no
 `WebApplicationFactory<Program>`-based end-to-end `Api` test yet — add
 `Microsoft.AspNetCore.Mvc.Testing` when that's worth the setup.
 
@@ -75,8 +75,11 @@ Code that belongs here:
   order-summary/order-query methods) against the real database.
 - `Customers/CustomerWriteRepositoryTests.cs` — `CustomerWriteRepository` inserts/updates/deletes
   against the real database, each test cleaning up its own throwaway row.
-- `Caching/RedisCustomerCacheRepositoryTests.cs` — `RedisCustomerCacheRepository` against the real
-  `local-redis` container, including the cache-unavailable → `CacheUnavailableException` path.
+- `Addresses/AddressReadRepositoryTests.cs` — `AddressReadRepository`'s customer-scoped address
+  reads (ordering, field mapping, cross-customer scoping) against the real database.
+- `Caching/RedisCustomerCacheRepositoryTests.cs` — `RedisCustomerCacheRepository` against a real
+  local Redis instance (`localhost:6379`, per this project's `appsettings.json`), including the
+  cache-unavailable → `CacheUnavailableException` path.
 - End-to-end controller tests via `WebApplicationFactory<Program>`, if/when that's worth the setup.
 
 ## Goal

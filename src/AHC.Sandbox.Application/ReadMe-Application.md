@@ -10,19 +10,22 @@ but is written without any knowledge of HTTP, so nothing stops another host from
 
 The Application layer is responsible for:
 
-- Implementing use cases (one service per resource, e.g. `CustomerService`)
-- Coordinating domain objects and the repository ports that read/write them
+- Implementing use cases (one service per resource — `CustomerService`, `AddressService`)
+- Coordinating domain objects and the repository ports (interfaces) that read/write them
 - Defining DTOs — the boundary shape between the outside world and the domain (e.g.
-  `CustomerDto`, `CreateCustomerDto`, `UpdateCustomerDto`, `PatchCustomerDto`,
-  `CustomerSummaryDto`, `CustomerOrderDto`, `CustomerOrderSummaryDto`)
-- Defining the repository and service **interfaces** that `Data`/`Infrastructure` implement
-  (e.g. `ICustomerReadRepository`, `ICustomerWriteRepository`, `ICustomerService`) — Application
-  owns these ports, it doesn't implement them
+  `CustomerDto`, `CreateCustomerDto`, `CustomerOrderDto`, `CustomerSummaryDto`,
+  `CustomerRewardsDto`, `CustomerAddressDto`)
+- Defining two kinds of **interfaces**, with different implementers:
+  - repository/cache ports that `Data` and `Infrastructure` implement
+    (`ICustomerReadRepository`, `ICustomerWriteRepository`, `IAddressReadRepository`,
+    `ICustomerCacheRepository`) — Application owns these but never implements them
+  - service interfaces that Application implements itself and `Api` consumes
+    (`ICustomerService`, `IAddressService`)
 - Mapping between `Domain` entities and DTOs
 
 Code is organized per resource under `<Resource>/Dtos`, `<Resource>/Interfaces`,
-`<Resource>/Services` (see the `Customers/` folder) — follow that same shape for a new resource
-rather than inventing a different one.
+`<Resource>/Services` (see the `Customers/` and `Addresses/` folders) — follow that same shape
+for a new resource rather than inventing a different one.
 
 ## Design Principles
 
@@ -49,11 +52,12 @@ dependencies on persistence or external systems flow through interfaces defined 
 
 Code that belongs here:
 
-- Service implementations — `CustomerService`
-- Service and repository interfaces — `ICustomerService`, `ICustomerReadRepository`,
-  `ICustomerWriteRepository`
+- Service implementations — `CustomerService`, `AddressService`
+- Service, repository, and cache interfaces — `ICustomerService`, `IAddressService`,
+  `ICustomerReadRepository`, `ICustomerWriteRepository`, `IAddressReadRepository`,
+  `ICustomerCacheRepository`
 - DTOs and Domain ↔ DTO mapping
-- `DependencyInjection.cs`'s `AddApplication()` extension method, registering the service(s)
+- `DependencyInjection.cs`'s `AddApplication()` extension method, registering the services
 
 Code that does **not** belong here:
 

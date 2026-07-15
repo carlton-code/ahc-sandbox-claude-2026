@@ -1,0 +1,39 @@
+@AHC.Sandbox.Api_HostAddress = https://localhost:7143
+
+### List all customers
+GET {{AHC.Sandbox.Api_HostAddress}}/api/v1/customers
+Accept: application/json
+
+### Search customers by name (first, last, or "First Last")
+GET {{AHC.Sandbox.Api_HostAddress}}/api/v1/customers/search?q=Orlando
+Accept: application/json
+
+### Get one customer
+GET {{AHC.Sandbox.Api_HostAddress}}/api/v1/customers/1
+Accept: application/json
+
+### Create a customer
+POST {{AHC.Sandbox.Api_HostAddress}}/api/v1/customers
+Content-Type: application/json
+
+{
+  "firstName": "Test",
+  "lastName": "Customer",
+  "emailAddress": "test.customer@example.com"
+}
+
+### Orders for a customer (29485 has orders; most customers have none)
+GET {{AHC.Sandbox.Api_HostAddress}}/api/v1/customers/29485/orders
+Accept: application/json
+
+### Order summary for a customer
+GET {{AHC.Sandbox.Api_HostAddress}}/api/v1/customers/29485/order-summary
+Accept: application/json
+
+### Rewards tier for a customer (customer 3 has one; customer 1 returns 200 with null tier fields)
+GET {{AHC.Sandbox.Api_HostAddress}}/api/v1/customers/3/rewards
+Accept: application/json
+
+### Addresses for a customer (29503 has two; a customer with none returns 200 [])
+GET {{AHC.Sandbox.Api_HostAddress}}/api/v1/customers/29503/addresses
+Accept: application/json

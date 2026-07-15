@@ -10,7 +10,7 @@ Application layer without the Application layer knowing the concrete details.
 
 The Infrastructure layer is responsible for:
 
-- Implementing technical service interfaces defined in `Application`/`Domain`
+- Implementing technical service interfaces defined in `Application`
 - Currently: **Redis caching** for the `Customer` resource, under `Caching/` and `Configuration/`
 
 **Current state:**
@@ -38,8 +38,8 @@ choosing Redis over `IMemoryCache`.
 
 The Infrastructure layer should:
 
-- Implement interfaces defined in `Application` (or, failing that, move the interface there —
-  see above)
+- Implement interfaces defined in `Application` — if the interface a new service needs doesn't
+  exist yet, define it in `Application`, not in this project
 - Isolate external dependencies (Redis, and anything else added later) from the rest of the
   application
 - Be replaceable/mockable for testing — `Application` should depend on the interface, never on

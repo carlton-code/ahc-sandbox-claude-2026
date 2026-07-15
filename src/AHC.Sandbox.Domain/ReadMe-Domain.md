@@ -10,13 +10,14 @@ it's accessed — no framework, no database, no HTTP.
 
 The Domain layer is responsible for:
 
-- Defining core business entities (currently just `Customer`, under `Entities/`)
+- Defining core business entities (currently `Customer` and `Address`, under `Entities/`)
 - Defining domain rules and invariants as they emerge
 - Defining value objects, enums, and domain events, if/when the model needs them
 
-**Current state:** `Customer` is the only entity, and it's intentionally simple today — plain
-properties plus one computed property (`FullName`). There's no other business logic here yet
-because none of the resources implemented so far (`Customer`) have needed it. As soon as a real
+**Current state:** `Customer` and `Address` are the only entities, and both are intentionally
+simple today — plain properties plus one computed property each (`FullName`,
+`SingleLineAddress`). There's no other business logic here yet because none of the resources
+implemented so far have needed it. As soon as a real
 business rule shows up (e.g. rewards-tier eligibility, order/bundle validation), it belongs on the
 relevant domain entity or a domain service — not bolted onto an `Application` service or, worse, a
 controller. See `.claude/skills/clean-architecture/SKILL.md`'s note on anemic-model drift.
@@ -46,7 +47,7 @@ reverse.
 
 Code that belongs here:
 
-- Entity definitions (`Customer` today; future entities for `Product`, `Address`, bundles,
+- Entity definitions (`Customer` and `Address` today; future entities for `Product`, bundles,
   rewards tiers, etc. as those resources are built out)
 - Value object definitions, business rules, and guard clauses, once they exist
 - Domain services with pure business behavior (no persistence, no I/O)

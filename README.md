@@ -9,8 +9,8 @@ below).
 
 An ASP.NET Core Web API over the `SalesLT` schema of AdventureWorksLT, plus two custom schemas —
 `SalesIntelligence` and `Rewards` — that extend the sample database with product bundles,
-recommendations, and a customer rewards program. `Customer` (with CRUD and order-reporting
-endpoints) is the only resource in the API today.
+recommendations, and a customer rewards program. `Customer` is the only top-level resource in the
+API today, with CRUD, name-search, order-reporting, rewards, and address endpoints.
 
 ## Solution layout
 
@@ -22,7 +22,7 @@ endpoints) is the only resource in the API today.
 | `src/AHC.Sandbox.Infrastructure` | Cross-cutting technical services. Redis caching is wired into `CustomerService` (cache-aside on reads, invalidate-on-write on mutations) via `AddInfrastructure`. |
 | `src/AHC.Sandbox.Api` | ASP.NET Core host: controllers, `Program.cs`, Swagger/OpenAPI. |
 | `tests/AHC.Sandbox.UnitTests` | Fast NUnit tests against fakes — no real database or Redis. |
-| `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure — real SQL Server (`Customers/`) and a real Redis instance (`Caching/`) today; a `WebApplicationFactory`-based end-to-end `Api` test is the remaining gap. |
+| `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure — real SQL Server (`Customers/`, `Addresses/`) and a real Redis instance (`Caching/`) today; a `WebApplicationFactory`-based end-to-end `Api` test is the remaining gap. |
 
 Dependencies flow one direction: `Api` → `Application`/`Data`/`Infrastructure` → `Domain`. Each
 project has its own `ReadMe-<Project>.md` with the detailed purpose/responsibilities/design
@@ -49,14 +49,17 @@ Connects to a SQL Server instance running AdventureWorksLT — connection string
 `appsettings.Development.json`. There's no EF migrations tooling in this solution; the
 `DbContext` maps onto an existing database rather than creating/versioning one.
 
-Beyond the stock `SalesLT` schema, this particular database also has:
+Beyond the stock `SalesLT` schema, this database has two schemas that are custom to this project
+— they don't exist in Microsoft's published sample, so you won't get them from a normal
+AdventureWorksLT restore:
 
 - **`SalesIntelligence`** schema — `Bundle`, `BundleProduct`, `ProductRecommendations`,
   `CustomerRecommendations`
 - **`Rewards`** schema — `RewardsLevel`, `CustomerRewardsLevel`
 
-Neither is consumed by the API yet — they represent the next logical features to build (product
-bundles, recommendations, a rewards program). See
+`Rewards` backs the customer rewards endpoint (`GET /api/v1/customers/{id}/rewards`);
+`SalesIntelligence` isn't consumed by the API yet — product bundles and recommendations are the
+next logical features to build. See
 [`docs/database-schema.md`](docs/database-schema.md) for a short, curated summary of just the
 tables this codebase actually touches (a better starting point than the full schema), and
 [`.claude/skills/adventureworks-schema/SKILL.md`](.claude/skills/adventureworks-schema/SKILL.md)
@@ -66,17 +69,37 @@ on top of the public sample.
 
 ## Running it
 
+You'll need:
+
+- the **.NET 10 SDK**
+- **SQL Server** hosting this project's copy of AdventureWorksLT, reachable via
+  `ConnectionStrings:AdventureWorksLt` (see [Database](#database) above). A stock AdventureWorksLT
+  restore is **not** enough on its own: this database has diverged from the public sample — the
+  two custom schemas, two extra `SalesLT` columns, dropped password columns (ADR-0007), and an
+  added primary key (ADR-0008). The two ADRs record their DDL, but there's currently no script
+  that recreates the custom schemas from scratch.
+- **Redis**, for the customer cache — Development expects it at `localhost:6379`
+  (`appsettings.Development.json`). Redis being *down* is tolerated: the API still starts and
+  serves requests, with reads falling back to the database. Only an empty `Redis:Configuration`
+  setting stops startup, by design.
+
 ```
 dotnet build
 dotnet run --project src/AHC.Sandbox.Api
 ```
 
-In Development, Swagger UI is available at `/swagger` on the running host, backed by the
-generated OpenAPI document at `/openapi/v1.json`. Tests use NUnit:
+The API starts on `https://localhost:7143` (from `launchSettings.json`) in the Development
+environment, where Swagger UI is available at `/swagger`, backed by the generated OpenAPI
+document at `/openapi/v1.json`. `src/AHC.Sandbox.Api/AHC.Sandbox.Api.http` has ready-made
+requests for every kind of endpoint.
 
 ```
 dotnet test
 ```
+
+runs both NUnit test projects. `AHC.Sandbox.IntegrationTests` talks to the real SQL Server and
+Redis above, so it fails without them — use `dotnet test tests/AHC.Sandbox.UnitTests` for the
+fast, infrastructure-free suite.
 
 ## Working with Claude Code on this project
 
