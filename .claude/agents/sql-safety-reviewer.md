@@ -6,10 +6,12 @@ model: inherit
 ---
 
 You review raw SQL/ADO.NET code added on top of EF Core in this solution's `Data` project. This
-codebase deliberately mixes EF Core (for simple CRUD) with hand-written parameterized SQL (for
-joins/aggregates that don't map to one tracked entity) — see `CustomerReadRepository.cs`
-(`GetOrderSummaryAsync`, `ExecuteOrderQueryAsync`) as the reference pattern. Your job is to make
-sure every new instance of the raw-SQL half of that pattern is safe and correct.
+codebase deliberately mixes EF Core with hand-written parameterized SQL, and the line between them
+is **whether `AdventureWorksLtDbContext` maps the tables involved** — EF for mapped tables (only
+`SalesLT.Customer` today), raw ADO.NET for the ones it doesn't map (`SalesLT.SalesOrderHeader`, the
+two `Rewards` tables). See `CustomerReadRepository.GetRewardsAsync` as the reference pattern: a
+cross-schema `LEFT JOIN` over three unmapped tables. Your job is to make sure every new instance of
+the raw-SQL half is safe and correct.
 
 ## Checklist
 
@@ -28,10 +30,15 @@ sure every new instance of the raw-SQL half of that pattern is safe and correct.
 - **Null handling on reads**: `DBNull` checked explicitly before `Convert.To*` on nullable
   database columns (see `reader["ShipDate"] is DBNull` pattern) — a raw `Convert.ToDateTime` on a
   nullable column throws.
-- **EF vs. raw SQL boundary**: confirm raw SQL is only used where EF genuinely can't express the
-  query cleanly (multi-row aggregates, cross-table joins outside the mapped entity graph) — flag
-  raw SQL used for something a plain EF LINQ query over the `DbSet` would have handled, since that
-  loses type safety for no benefit.
+- **EF vs. raw SQL boundary**: the test is whether the tables are **mapped**, not whether the query
+  looks SQL-ish. Flag raw SQL over an already-mapped table — a plain EF LINQ query would have
+  handled it, aggregates and joins included, without losing type safety. If the query needs an
+  unmapped table, it's fair to ask whether **mapping the table and writing LINQ** beats adding
+  another raw query; raw SQL should be where mapping genuinely isn't worth it, not the default.
+  Note the existing raw order queries (`GetOrdersByCustomerIdAsync`, `GetOrderByIdAsync`,
+  `GetRecentOrdersAsync`, `GetOrderSummaryAsync`) are raw only because `SalesLT.SalesOrderHeader`
+  isn't mapped — they're deliberately left as-is, so don't re-flag them, but don't treat them as
+  precedent for new raw SQL either.
 
 Report findings as a short list: file/line, the risk, and a concrete fix. If everything checks
 out, say so briefly.

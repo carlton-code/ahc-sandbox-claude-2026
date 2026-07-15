@@ -31,13 +31,22 @@ The Data layer should:
 - Focus purely on persistence and retrieval — no business rules
 - Keep database concerns out of `Domain` and `Application`
 - Implement the repository abstractions `Application` defines, rather than defining its own
-- Mix two data-access techniques deliberately, not interchangeably:
-  - **EF Core** (`AsNoTracking()` on reads) for simple CRUD against a single mapped entity.
-  - **Raw parameterized ADO.NET** (`_dbContext.Database.GetDbConnection()` + `DbCommand`) only
-    for joins/aggregates that don't map cleanly to one tracked entity — see
-    `CustomerReadRepository.GetOrderSummaryAsync`/`ExecuteOrderQueryAsync` for the reference
-    pattern, including the open/close-connection-in-`finally` handling. See
-    `.claude/agents/sql-safety-reviewer.md` for what "safe" raw SQL looks like here.
+- Mix two data-access techniques deliberately, not interchangeably. **What decides between them is
+  whether `AdventureWorksLtDbContext` maps the tables — not whether the query has joins or
+  aggregates:**
+  - **EF Core** (`AsNoTracking()` on reads) — the default, for anything over a **mapped** table.
+    `SalesLT.Customer` is the only one mapped today. Aggregates and joins over mapped tables are
+    still EF's job; it handles them fine.
+  - **Raw parameterized ADO.NET** (`_dbContext.Database.GetDbConnection()` + `DbCommand`) only for
+    tables the `DbContext` **doesn't map**, which EF can't see at all — `SalesLT.SalesOrderHeader`
+    and the two `Rewards` tables. See `CustomerReadRepository.GetRewardsAsync` for the reference
+    pattern (a cross-schema `LEFT JOIN` over three unmapped tables), including the
+    open/close-connection-in-`finally` handling, and `.claude/agents/sql-safety-reviewer.md` for
+    what "safe" raw SQL looks like here.
+  - When a new feature needs an unmapped table, **prefer mapping it and writing LINQ** over adding
+    another raw query. The existing raw order queries are raw only because
+    `SalesLT.SalesOrderHeader` isn't mapped — LINQ could express them — so don't read them as
+    precedent that aggregates require SQL.
 
 ## Dependencies
 

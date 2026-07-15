@@ -3,9 +3,9 @@
 ## Purpose
 
 The `AHC.Sandbox.IntegrationTests` project contains tests that need real infrastructure to mean
-anything — a real SQL Server against the AdventureWorksLT database, eventually a real Redis
-instance, and/or a running `Api` host. It's the counterpart to `AHC.Sandbox.UnitTests`, which
-covers `Domain`/`Application` logic in isolation with fakes.
+anything — a real SQL Server against the AdventureWorksLT database, a real Redis instance, and/or
+a running `Api` host. It's the counterpart to `AHC.Sandbox.UnitTests`, which covers
+`Domain`/`Application` logic in isolation with fakes.
 
 **Current state:** this project has a checked-in `appsettings.json` (`ConnectionStrings:AdventureWorksLt`
 plus a `Redis` section) copied to the output directory, and `Infrastructure/TestConfiguration.cs`,
@@ -23,8 +23,9 @@ This project is responsible for:
 - Testing `Data` repository behavior against a real SQL Server — especially the raw ADO.NET
   methods in `CustomerReadRepository` (`GetOrderSummaryAsync`, `ExecuteOrderQueryAsync`) that a
   fake repository can't meaningfully exercise, since their whole job is running real SQL
-- Testing `Infrastructure`'s Redis caching once it's built out (see
-  `.claude/agents/redis-cache-builder.md`) against a real Redis instance
+- Testing `Infrastructure`'s Redis caching against a real Redis instance —
+  `Caching/RedisCustomerCacheRepositoryTests.cs` on top of `Infrastructure/RedisTestFixture.cs`
+  (see `.claude/agents/redis-cache-builder.md` for the pattern under test)
 - Optionally, full end-to-end `Api` tests (real HTTP request → real controller → real database)
   where that's more valuable than testing a repository in isolation
 

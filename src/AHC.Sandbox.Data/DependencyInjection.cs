@@ -1,4 +1,5 @@
-﻿using AHC.Sandbox.Application.Customers.Interfaces;
+﻿using AHC.Sandbox.Application.Addresses.Interfaces;
+using AHC.Sandbox.Application.Customers.Interfaces;
 using AHC.Sandbox.Data.Context;
 using AHC.Sandbox.Data.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ namespace AHC.Sandbox.Data
 
             services.AddScoped<ICustomerReadRepository, CustomerReadRepository>();
             services.AddScoped<ICustomerWriteRepository, CustomerWriteRepository>();
+            services.AddScoped<IAddressReadRepository, AddressReadRepository>();
 
             return services;
         }

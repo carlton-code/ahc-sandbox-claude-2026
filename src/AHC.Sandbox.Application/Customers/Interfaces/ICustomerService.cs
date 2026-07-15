@@ -12,6 +12,7 @@ namespace AHC.Sandbox.Application.Customers.Interfaces
     {
         Task<IReadOnlyCollection<CustomerDto>> GetCustomersAsync(CancellationToken cancellationToken = default);
         Task<CustomerDto?> GetCustomerByIdAsync(int customerId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyCollection<CustomerDto>> SearchCustomersAsync(string searchTerm, CancellationToken cancellationToken = default);
         Task<CustomerDto> CreateCustomerAsync(CreateCustomerDto customer, CancellationToken cancellationToken = default);
         Task<bool> UpdateCustomerAsync(int customerId, UpdateCustomerDto customer, CancellationToken cancellationToken = default);
         Task<CustomerDto?> PatchCustomerAsync(int customerId, PatchCustomerDto customer, CancellationToken cancellationToken = default);
@@ -21,5 +22,6 @@ namespace AHC.Sandbox.Application.Customers.Interfaces
         Task<CustomerSummaryDto?> GetCustomerSummaryAsync(int customerId, CancellationToken cancellationToken = default);
         Task<IReadOnlyCollection<CustomerOrderDto>?> GetCustomerRecentOrdersAsync(int customerId, CancellationToken cancellationToken = default);
         Task<CustomerOrderSummaryDto?> GetCustomerOrderSummaryAsync(int customerId, CancellationToken cancellationToken = default);
+        Task<CustomerRewardsDto?> GetCustomerRewardsAsync(int customerId, CancellationToken cancellationToken = default);
     }
 }

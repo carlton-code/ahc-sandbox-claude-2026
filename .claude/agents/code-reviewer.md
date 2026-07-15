@@ -47,9 +47,10 @@ don't edit code. If nothing's wrong, say so briefly rather than inventing findin
   binding to an entity is a mass-assignment/over-posting risk (a client could set any field the
   entity has, not just the ones a DTO chooses to expose). Check that new `Create<Resource>Dto`/
   `Update<Resource>Dto` types expose only fields a client should legitimately be able to set.
-- `SalesLT.Customer.PasswordHash`/`PasswordSalt` (see the schema skill) must never appear in a
-  DTO or a raw SQL projection — there's no auth feature in this API, so there's no legitimate
-  reason for either to leave the database.
+- Credential-shaped columns must never appear in a DTO or a raw SQL projection. There's no auth
+  feature in this API — `SalesLT.Customer`'s stock `PasswordHash`/`PasswordSalt` were dropped from
+  the table outright rather than mapped (see `docs/adr/0007-drop-password-columns-from-customer.md`),
+  so flag any attempt to reintroduce them or anything like them.
 - Where a resource ID appears in both the route and the body DTO, the action should treat the
   route value as the source of truth rather than trusting a body-supplied ID that could disagree
   with it.

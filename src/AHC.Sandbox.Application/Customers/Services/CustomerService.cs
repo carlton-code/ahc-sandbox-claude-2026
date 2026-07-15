@@ -66,6 +66,15 @@ namespace AHC.Sandbox.Application.Customers.Services
             return customerDto;
         }
 
+        public async Task<IReadOnlyCollection<CustomerDto>> SearchCustomersAsync(string searchTerm, CancellationToken cancellationToken = default)
+        {
+            var customers = await _customerReadRepository.SearchByNameAsync(searchTerm, cancellationToken);
+
+            return customers
+                .Select(MapCustomer)
+                .ToArray();
+        }
+
         public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerDto customer, CancellationToken cancellationToken = default)
         {
             var createdCustomer = await _customerWriteRepository.CreateAsync(customer, cancellationToken);
@@ -166,6 +175,11 @@ namespace AHC.Sandbox.Application.Customers.Services
         public Task<CustomerOrderSummaryDto?> GetCustomerOrderSummaryAsync(int customerId, CancellationToken cancellationToken = default)
         {
             return _customerReadRepository.GetOrderSummaryAsync(customerId, cancellationToken);
+        }
+
+        public Task<CustomerRewardsDto?> GetCustomerRewardsAsync(int customerId, CancellationToken cancellationToken = default)
+        {
+            return _customerReadRepository.GetRewardsAsync(customerId, cancellationToken);
         }
 
         private async Task<(bool CacheAvailable, CustomerDto? Customer)> TryGetCachedCustomerAsync(int customerId, CancellationToken cancellationToken)

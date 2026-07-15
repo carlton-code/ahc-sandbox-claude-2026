@@ -12,7 +12,10 @@ namespace AHC.Sandbox.Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
-            services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName));
+            services.AddOptions<RedisOptions>()
+                .Bind(configuration.GetSection(RedisOptions.SectionName))
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
 
             services.AddSingleton<IConnectionMultiplexer>(serviceProvider =>
             {

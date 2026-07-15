@@ -43,20 +43,68 @@ Order history queried for a customer's orders/summary endpoints.
 - **Touched by:** `CustomerReadRepository.GetOrdersByCustomerIdAsync` /
   `GetOrderByIdAsync` / `GetRecentOrdersAsync` / `GetOrderSummaryAsync`.
 
+### `Rewards.CustomerRewardsLevel` + `Rewards.RewardsLevel`
+
+The customer rewards-tier assignment, exposed by `GET /api/v1/customers/{id}/rewards`.
+
+- **Not EF-mapped** — read via one raw parameterized `LEFT JOIN` across both tables, in
+  `CustomerReadRepository.GetRewardsAsync`.
+- **Columns currently selected:** `CustomerRewardsLevel.CustomerId`/`RewardsLevelId`;
+  `RewardsLevel.RewardsLevelName`/`DiscountPercent`. That's every column both tables have.
+- **One tier per customer, enforced by `PK_CustomerRewardsLevel` on `CustomerId` alone** — added
+  by this project, see ADR-0008. It looks like a many-to-many bridge table but isn't. The PK is
+  lost if the database is re-provisioned; re-run the `ALTER TABLE` in the ADR.
+- **Known gotcha:** `Gold` is `RewardsLevelId` **`0`** — the same as `default(int)`. `CustomerRewardsDto`
+  uses `int?` so "no tier" is `null` rather than accidentally reading as Gold. Gold currently has
+  no customers assigned at all.
+- **Known gotcha:** `DiscountPercent` is `decimal(18,4)` valued `.0010`/`.0009`/`.0008` — those are
+  **rates** (0.1%), not percentages, despite the column name. The DTO keeps the database's name
+  rather than silently reinterpreting it.
+- **Known gotcha:** 295 of 847 customers have no tier row. That's a normal state, so the query
+  `LEFT JOIN`s from `SalesLT.Customer` — an inner join would make a third of customers look
+  nonexistent. `null` from the repository means "no such customer", never "no tier".
+- **Touched by:** `Data/Repositories/CustomerReadRepository.cs` (`GetRewardsAsync`).
+
+### `SalesLT.Address` + `SalesLT.CustomerAddress`
+
+A customer's addresses, exposed by `GET /api/v1/customers/{id}/addresses` and
+`GET /api/v1/customers/{id}/addresses/{addressId}`.
+
+- **EF-mapped** by `AddressEntity`/`CustomerAddressEntity` + Fluent API config in
+  `Data/Context/AdventureWorksLtDbContext.cs`, read with plain LINQ. Mapped rather than read raw
+  precisely because `ef-core-conventions.md` says to prefer mapping a new table over adding
+  another raw query — the raw SQL elsewhere in this layer exists only for *unmapped* tables.
+- **Columns currently mapped:** `Address.AddressID`/`AddressLine1`/`AddressLine2`/`City`/
+  `StateProvince`/`CountryRegion`/`PostalCode`, and `CustomerAddress.CustomerID`/`AddressID`/
+  `AddressType`. `rowguid`/`ModifiedDate` on both tables are deliberately unmapped.
+- **Safe to leave `rowguid`/`ModifiedDate` unmapped**, unlike ADR-0007's password columns: both are
+  `NOT NULL` but both have database defaults (`newid()`/`getdate()`), so their absence can't break
+  an insert if writes are ever added.
+- **Known gotcha:** `StateProvince`, `CountryRegion` and `AddressType` are the `Name` **alias type**
+  in this database, not `nvarchar` directly. EF maps them fine as the underlying `nvarchar(50)`.
+- **Known gotcha:** **440 of 847 customers have no address at all** — an empty list is the majority
+  state, not an error. The API returns `200 []` for it and reserves `404` for a customer that
+  doesn't exist, which is why `AddressService` probes the customer before querying addresses.
+- **Known gotcha:** `AddressType` is only ever `Main Office` (407 rows) or `Shipping` (10). The 10
+  customers with two addresses have one of each — which is why the read orders by `AddressType`
+  then `AddressID` rather than by id alone.
+- **`SalesOrderHeader.ShipToAddressID`/`BillToAddressID` also FK onto `Address`.** Irrelevant to
+  these read-only endpoints, but it means a future hard `DELETE` of an address can violate a
+  constraint.
+- **Touched by:** `Data/Repositories/AddressReadRepository.cs`.
+
 ## Not in use
 
 No entity, mapping, query, or controller exists for these — nothing here counts as "in use."
 
-- **`SalesLT.Address`**, **`SalesLT.CustomerAddress`**, **`SalesLT.ProductCategory`** — no code
-  references these.
+- **`SalesLT.ProductCategory`** — no code references this.
 - **`SalesLT.Product`** — no code references this. Has a non-standard column, `CurrentDiscount`,
   not in the public sample.
 - The rest of `SalesLT` — `ProductModel`, `ProductDescription`, `ProductModelProductDescription`,
   `SalesOrderDetail`, and the three catalog views (`vGetAllCategories`, `vProductAndDescription`,
   `vProductModelCatalogDescription`).
-- **`SalesIntelligence`** and **`Rewards`** — entirely unbuilt schemas (product bundles,
-  recommendations, a customer rewards-tier program). See the schema skill for the table shapes if
-  that work starts.
+- **`SalesIntelligence`** — an entirely unbuilt schema (product bundles, recommendations). See the
+  schema skill for the table shapes if that work starts. (`Rewards` is now in use — see above.)
 - `dbo` housekeeping tables (`BuildVersion`, `ErrorLog`, `sysdiagrams`) — never relevant to this
   API.
 

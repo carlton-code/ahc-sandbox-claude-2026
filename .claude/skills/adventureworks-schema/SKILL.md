@@ -27,10 +27,11 @@ JOIN INFORMATION_SCHEMA.COLUMNS c
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME, c.ORDINAL_POSITION;
 ```
 
-Already mapped in this codebase: `SalesLT.Customer` (see
-`Data/Context/AdventureWorksLtDbContext.cs` for the authoritative Fluent API mapping — that's a
-better source of truth than this file for the columns it covers) and read via raw SQL:
-`SalesLT.SalesOrderHeader` (see `CustomerReadRepository.cs`).
+Already mapped in this codebase: `SalesLT.Customer`, `SalesLT.Address` and
+`SalesLT.CustomerAddress` (see `Data/Context/AdventureWorksLtDbContext.cs` for the authoritative
+Fluent API mapping — that's a better source of truth than this file for the columns it covers).
+Read via raw SQL instead, because they're unmapped: `SalesLT.SalesOrderHeader` and the two
+`Rewards` tables (see `CustomerReadRepository.cs`).
 
 ## SalesLT schema
 
@@ -62,31 +63,51 @@ expecting a public-sample match.
 materialization. Worth flagging rather than silently "fixing" if noticed while scaffolding nearby
 code.
 
-### SalesLT.Address — not used by any code
+### SalesLT.Address — mapped (`AddressEntity`)
 
 | Column | Type | Nullable |
 |---|---|---|
-| AddressID (PK) | int | NO |
+| AddressID (PK, **IDENTITY**) | int | NO |
 | AddressLine1 | nvarchar(60) | NO |
 | AddressLine2 | nvarchar(60) | YES |
 | City | nvarchar(30) | NO |
 | StateProvince | nvarchar(50) | NO |
 | CountryRegion | nvarchar(50) | NO |
 | PostalCode | nvarchar(15) | NO |
-| rowguid | uniqueidentifier | NO |
-| ModifiedDate | datetime | NO |
+| rowguid | uniqueidentifier | NO (default `newid()`) |
+| ModifiedDate | datetime | NO (default `getdate()`) |
 
-### SalesLT.CustomerAddress — not used by any code
+`StateProvince`/`CountryRegion` are the `Name` **alias type** over `nvarchar(50)`, not `nvarchar`
+directly — EF maps them as the underlying type. `AddressLine2` is the only nullable text column.
+
+### SalesLT.CustomerAddress — mapped (`CustomerAddressEntity`)
 
 | Column | Type | Nullable |
 |---|---|---|
 | CustomerID (PK, FK → Customer) | int | NO |
 | AddressID (PK, FK → Address) | int | NO |
-| AddressType | nvarchar(50) | NO |
-| rowguid | uniqueidentifier | NO |
-| ModifiedDate | datetime | NO |
+| AddressType | nvarchar(50) (`Name` alias type) | NO |
+| rowguid | uniqueidentifier | NO (default `newid()`) |
+| ModifiedDate | datetime | NO (default `getdate()`) |
 
-Composite PK (`CustomerID`, `AddressID`) — map with `HasKey(e => new { e.CustomerId, e.AddressId })`.
+Composite PK (`CustomerID`, `AddressID`) — mapped with
+`HasKey(e => new { e.CustomerId, e.AddressId })`.
+
+Both tables are read with plain LINQ via `Data/Repositories/AddressReadRepository.cs`, behind
+`GET /api/v1/customers/{id}/addresses`. `rowguid`/`ModifiedDate` are unmapped on both — safe,
+because both have database defaults (unlike ADR-0007's password columns).
+
+**Gotchas:**
+
+- **440 of 847 customers have no address at all** (only 407 do). An empty list is the normal
+  majority case — `200 []`, not a 404.
+- `AddressType` is only ever **`Main Office`** (407 rows) or **`Shipping`** (10). The 10 customers
+  with two addresses have exactly one of each.
+- No address is linked to more than one customer today, but nothing enforces that — don't map it
+  as a 1:1.
+- 450 `Address` rows vs 417 `CustomerAddress` links: **33 addresses belong to no customer**,
+  reachable only through `SalesOrderHeader.ShipToAddressID`/`BillToAddressID`, which also FK onto
+  this table. That blocks a future hard `DELETE` of an address.
 
 ### SalesLT.Product — not used by any code
 
@@ -218,20 +239,49 @@ Backs product bundles and recommendations. Use the exact schema name in EF mappi
 - **CustomerRecommendations**: `CustomerId` (FK → `SalesLT.Customer`), `ProductId` (FK →
   `SalesLT.Product`) — per-customer recommended products.
 
-## Rewards schema — no code references these yet
+## Rewards schema — read by `GET /api/v1/customers/{id}/rewards`
 
-Backs a customer rewards-tier program. Use the exact schema name in EF mappings, e.g.
-`entity.ToTable("RewardsLevel", "Rewards")`.
+Backs a customer rewards-tier program. Verified against the live database 2026-07-14. Neither
+table is EF-mapped: they're read via raw ADO.NET in `CustomerReadRepository.GetRewardsAsync`, so
+use the fully-qualified `Rewards.<Table>` name in SQL. If you ever do map them, use the exact
+schema name, e.g. `entity.ToTable("RewardsLevel", "Rewards")`.
 
-- **RewardsLevel**: `RewardsLevelId` (PK, int), `RewardsLevelName` varchar(50) NOT NULL,
-  `DiscountPercent` decimal (nullable).
-- **CustomerRewardsLevel**: `CustomerId` (FK → `SalesLT.Customer`), `RewardsLevelId` (FK →
-  `Rewards.RewardsLevel`) — join table assigning each customer a rewards tier.
+**Rewards.RewardsLevel**
 
-None of the `SalesIntelligence`/`Rewards` tables have a Domain entity, Application DTO,
-repository, or controller yet. Building an endpoint over any of them is a brand-new vertical
-slice (see `.claude/agents/api-scaffolder.md`), and the resulting `DbContext` will span three
-schemas (`SalesLT`, `SalesIntelligence`, `Rewards`) with cross-schema foreign keys into
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `RewardsLevelId` | `int` | NO | PK, clustered, **IDENTITY** |
+| `RewardsLevelName` | `varchar(50)` | NO | |
+| `DiscountPercent` | `decimal(18,4)` | **YES** | needs a `DBNull` guard on read |
+
+Exactly three rows: **Gold = `0`**, Silver = `1`, Bronze = `2`.
+
+**Rewards.CustomerRewardsLevel**
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `CustomerId` | `int` | NO | **PK** (`PK_CustomerRewardsLevel`, clustered), FK → `SalesLT.Customer.CustomerID` |
+| `RewardsLevelId` | `int` | NO | FK → `Rewards.RewardsLevel.RewardsLevelId` |
+
+Two columns only — no surrogate key, no dates, no `ModifiedDate`. **Not** a many-to-many bridge
+despite the shape: the PK is on `CustomerId` alone, so a customer has **at most one** tier. See
+`docs/adr/0008-one-rewards-tier-per-customer.md` — that PK was added deliberately and is lost if
+this database is re-provisioned.
+
+### Gotchas
+
+- **Gold is `RewardsLevelId` `0`**, which collides with `default(int)`. Use `int?` in any DTO or
+  mapping so "no tier" is `null` and can never be confused with Gold. Gold also has **zero**
+  customers assigned today.
+- **`DiscountPercent` is a rate, not a percentage** — the values are `.0010`/`.0009`/`.0008`,
+  i.e. 0.1%/0.09%/0.08%. The column name says otherwise. Don't multiply by 100 assuming the name
+  is accurate, and don't "fix" the data assuming the values are wrong.
+- **295 of 847 customers have no tier row at all.** A customer with no tier is a normal state, not
+  an error — read with a `LEFT JOIN` from `SalesLT.Customer`, never an inner join.
+
+The `SalesIntelligence` tables still have no Domain entity, Application DTO, repository, or
+controller. Building an endpoint over any of them is a brand-new vertical slice (see
+`.claude/agents/api-scaffolder.md`), with cross-schema foreign keys into
 `SalesLT.Product`/`SalesLT.Customer`.
 
 ## dbo schema — housekeeping only, never part of the API surface
