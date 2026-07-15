@@ -40,6 +40,10 @@ The API layer should:
 - Route pattern: `[Route("api/v1/[controller]")]`.
 - Status codes: `NotFound()` when a nullable lookup returns `null`; `NoContent()` on a successful
   mutation; `NotFound()` on a mutation whose target doesn't exist; `CreatedAtAction` on `POST`.
+- A write that violates a database constraint surfaces as `409 Conflict`, translated by
+  `Infrastructure/DatabaseConflictExceptionHandler.cs` (this project's `Infrastructure/` folder,
+  not the `AHC.Sandbox.Infrastructure` project) — controllers don't catch it themselves. See
+  `docs/adr/0009-customer-delete-refuses-rather-than-cascades.md`.
 - Actions with a response body return `ActionResult<T>`; body-less ones (`PUT`/`DELETE`) return
   `IActionResult`.
 - Every status an action can return is declared with `[ProducesResponseType]`, **including the
@@ -66,6 +70,8 @@ Code that belongs here:
 - `Program.cs` — composition root and middleware pipeline
 - Controllers — `CustomersController` is the only one today (fully implemented, the reference
   pattern to copy).
+- `Infrastructure/DatabaseConflictExceptionHandler.cs` — cross-cutting HTTP concern: translates
+  database constraint violations into `409` responses instead of unhandled 500s.
 
 Code that does **not** belong here:
 
