@@ -63,8 +63,9 @@ The term is **never split into first/last parts**, because this data makes that 
 last names contain a space (e.g. `Van Houten`), so splitting `Roger Van Houten` on the first space
 would search for the surname `Van` and find nothing, while splitting from the right breaks the six
 first names that contain a space (e.g. `Janaina Barreiro Gambaro`). The whole term is matched
-against each name column and against the name concatenations instead. See
-`CustomerReadRepository.SearchByNameAsync`.
+against the two full-name concatenations (with and without the middle name) instead — a first or
+last name is itself a substring of the concatenation, so matching the individual columns as well
+would be redundant. See `CustomerReadRepository.SearchByNameAsync`.
 
 `LIKE` metacharacters (`%`, `_`, `[`) in `q` are escaped and matched literally — `?q=%` returns an
 empty array, not every customer. No matches is `200` with `[]`, never `404`. Results are ordered by

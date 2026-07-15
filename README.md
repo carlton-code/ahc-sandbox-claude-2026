@@ -9,8 +9,8 @@ below).
 
 An ASP.NET Core Web API over the `SalesLT` schema of AdventureWorksLT, plus two custom schemas —
 `SalesIntelligence` and `Rewards` — that extend the sample database with product bundles,
-recommendations, and a customer rewards program. `Customer` (with CRUD and order-reporting
-endpoints) is the only resource in the API today.
+recommendations, and a customer rewards program. `Customer` is the only top-level resource in the
+API today, with CRUD, name-search, order-reporting, rewards, and address endpoints.
 
 ## Solution layout
 
@@ -22,7 +22,7 @@ endpoints) is the only resource in the API today.
 | `src/AHC.Sandbox.Infrastructure` | Cross-cutting technical services. Redis caching is wired into `CustomerService` (cache-aside on reads, invalidate-on-write on mutations) via `AddInfrastructure`. |
 | `src/AHC.Sandbox.Api` | ASP.NET Core host: controllers, `Program.cs`, Swagger/OpenAPI. |
 | `tests/AHC.Sandbox.UnitTests` | Fast NUnit tests against fakes — no real database or Redis. |
-| `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure — real SQL Server (`Customers/`) and a real Redis instance (`Caching/`) today; a `WebApplicationFactory`-based end-to-end `Api` test is the remaining gap. |
+| `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure — real SQL Server (`Customers/`, `Addresses/`) and a real Redis instance (`Caching/`) today; a `WebApplicationFactory`-based end-to-end `Api` test is the remaining gap. |
 
 Dependencies flow one direction: `Api` → `Application`/`Data`/`Infrastructure` → `Domain`. Each
 project has its own `ReadMe-<Project>.md` with the detailed purpose/responsibilities/design
@@ -55,8 +55,9 @@ Beyond the stock `SalesLT` schema, this particular database also has:
   `CustomerRecommendations`
 - **`Rewards`** schema — `RewardsLevel`, `CustomerRewardsLevel`
 
-Neither is consumed by the API yet — they represent the next logical features to build (product
-bundles, recommendations, a rewards program). See
+`Rewards` backs the customer rewards endpoint (`GET /api/v1/customers/{id}/rewards`);
+`SalesIntelligence` isn't consumed by the API yet — product bundles and recommendations are the
+next logical features to build. See
 [`docs/database-schema.md`](docs/database-schema.md) for a short, curated summary of just the
 tables this codebase actually touches (a better starting point than the full schema), and
 [`.claude/skills/adventureworks-schema/SKILL.md`](.claude/skills/adventureworks-schema/SKILL.md)
