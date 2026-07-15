@@ -1,3 +1,5 @@
+using AHC.Sandbox.Application.Addresses.Dtos;
+using AHC.Sandbox.Application.Addresses.Interfaces;
 using AHC.Sandbox.Application.Customers.Dtos;
 using AHC.Sandbox.Application.Customers.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -26,10 +28,12 @@ namespace AHC.Sandbox.Api.Controllers
     public class CustomersController : ControllerBase
     {
         private readonly ICustomerService _customerService;
+        private readonly IAddressService _addressService;
 
-        public CustomersController(ICustomerService customerService)
+        public CustomersController(ICustomerService customerService, IAddressService addressService)
         {
             _customerService = customerService;
+            _addressService = addressService;
         }
 
         [HttpGet]
@@ -182,6 +186,37 @@ namespace AHC.Sandbox.Api.Controllers
             var rewards = await _customerService.GetCustomerRewardsAsync(customerId, cancellationToken);
 
             return rewards is null ? NotFound() : Ok(rewards);
+        }
+
+        /// <summary>
+        /// Lists a customer's addresses.
+        /// </summary>
+        /// <remarks>
+        /// A customer with no addresses is a 200 with an empty array, not a 404 — that's the
+        /// majority case (440 of 847 customers have no address). Only an unknown customer is a
+        /// 404, which is why the service returns null rather than an empty collection for it.
+        /// </remarks>
+        [HttpGet("{customerId:int}/addresses")]
+        [ProducesResponseType<IReadOnlyCollection<CustomerAddressDto>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<IReadOnlyCollection<CustomerAddressDto>>> GetCustomerAddresses(int customerId, CancellationToken cancellationToken)
+        {
+            var addresses = await _addressService.GetCustomerAddressesAsync(customerId, cancellationToken);
+
+            return addresses is null ? NotFound() : Ok(addresses);
+        }
+
+        [HttpGet("{customerId:int}/addresses/{addressId:int}")]
+        [ProducesResponseType<CustomerAddressDto>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<CustomerAddressDto>> GetCustomerAddressById(
+            int customerId,
+            int addressId,
+            CancellationToken cancellationToken)
+        {
+            var address = await _addressService.GetCustomerAddressByIdAsync(customerId, addressId, cancellationToken);
+
+            return address is null ? NotFound() : Ok(address);
         }
     }
 }

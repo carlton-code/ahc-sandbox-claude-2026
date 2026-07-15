@@ -46,6 +46,8 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 | GET | `/api/v1/customers/{customerId}/recent-orders` | — | `CustomerOrderDto[]` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/order-summary` | — | `CustomerOrderSummaryDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/rewards` | — | `CustomerRewardsDto` | `200`, `404` |
+| GET | `/api/v1/customers/{customerId}/addresses` | — | `CustomerAddressDto[]` | `200`, `404` |
+| GET | `/api/v1/customers/{customerId}/addresses/{addressId}` | — | `CustomerAddressDto` | `200`, `404` |
 
 ### Search — `GET /api/v1/customers/search?q=<term>`
 
@@ -93,3 +95,19 @@ paging, consistent with that endpoint (847 customers is the ceiling).
   `404`; `404` means no such customer. `rewardsLevelId` is nullable rather than defaulting to `0`
   because `0` is a real tier (Gold) — see `docs/database-schema.md`. Note `discountPercent` is a
   rate (`0.0009` = 0.09%), not a percentage, despite the name.
+- **`CustomerAddressDto`**: `addressId` (int), `addressLine1`, `addressLine2?`, `city`,
+  `stateProvince`, `countryRegion`, `postalCode`, `singleLineAddress`, `addressType`.
+  `addressLine2` is the only nullable field. `singleLineAddress` is computed, not stored — the
+  non-empty parts joined with `", "`. `addressType` describes the customer↔address link rather
+  than the address, and is only ever `Main Office` or `Shipping`.
+
+### Addresses — `GET /api/v1/customers/{customerId}/addresses`
+
+A customer with **no addresses is a `200` with an empty array**, not a `404` — that's the majority
+case (440 of 847 customers have none). `404` means no such customer.
+
+Addresses are ordered by `addressType`, then `addressId`. The 10 customers who have two addresses
+have one `Main Office` and one `Shipping`.
+
+`GET /api/v1/customers/{customerId}/addresses/{addressId}` is scoped to the customer: a real
+`addressId` that belongs to a *different* customer returns `404`, not that customer's address.
