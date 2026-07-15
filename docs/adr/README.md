@@ -30,6 +30,7 @@ Each ADR follows the same shape (see `template.md`):
 | [0006](0006-dtos-as-the-api-boundary.md) | DTOs as the API boundary, never entities |
 | [0007](0007-drop-password-columns-from-customer.md) | Drop `PasswordHash`/`PasswordSalt` from `SalesLT.Customer` |
 | [0008](0008-one-rewards-tier-per-customer.md) | Enforce one rewards tier per customer at the schema level |
+| [0009](0009-customer-delete-refuses-rather-than-cascades.md) | Customer delete returns `409` rather than cascading |
 
 ## Adding a new ADR
 

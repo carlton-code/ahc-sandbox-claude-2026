@@ -79,6 +79,7 @@ namespace AHC.Sandbox.Api.Controllers
 
         [HttpPost]
         [ProducesResponseType<CustomerDto>(StatusCodes.Status201Created)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<CustomerDto>> CreateCustomer([FromBody] CreateCustomerDto customer, CancellationToken cancellationToken)
         {
             var createdCustomer = await _customerService.CreateCustomerAsync(customer, cancellationToken);
@@ -91,6 +92,7 @@ namespace AHC.Sandbox.Api.Controllers
 
         [HttpPut("{customerId:int}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateCustomer(
             int customerId,
@@ -104,6 +106,7 @@ namespace AHC.Sandbox.Api.Controllers
 
         [HttpPatch("{customerId:int}")]
         [ProducesResponseType<CustomerDto>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<CustomerDto>> PatchCustomer(
             int customerId,
@@ -115,9 +118,22 @@ namespace AHC.Sandbox.Api.Controllers
             return updatedCustomer is null ? NotFound() : Ok(updatedCustomer);
         }
 
+        /// <summary>
+        /// Deletes a customer.
+        /// </summary>
+        /// <remarks>
+        /// Returns <c>409</c> when anything still references the customer — an address, a rewards
+        /// tier, an order, or a recommendation. Every foreign key in this database is
+        /// <c>NO_ACTION</c> and every seeded customer is referenced by something, so in practice
+        /// <c>204</c> is reachable only for a customer created through this API that has nothing
+        /// attached to it yet. That's intended, not a limitation to engineer around: see
+        /// <c>docs/adr/0009-customer-delete-refuses-rather-than-cascades.md</c>.
+        /// The <c>409</c> comes from <c>DatabaseConflictExceptionHandler</c>, not from this action.
+        /// </remarks>
         [HttpDelete("{customerId:int}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> DeleteCustomer(int customerId, CancellationToken cancellationToken)
         {
             var deleted = await _customerService.DeleteCustomerAsync(customerId, cancellationToken);

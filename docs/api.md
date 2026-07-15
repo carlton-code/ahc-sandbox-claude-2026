@@ -36,10 +36,10 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 | GET | `/api/v1/customers` | — | `CustomerDto[]` | `200` |
 | GET | `/api/v1/customers/search?q=<term>` | — | `CustomerDto[]` | `200`, `400` |
 | GET | `/api/v1/customers/{customerId}` | — | `CustomerDto` | `200`, `404` |
-| POST | `/api/v1/customers` | `CreateCustomerDto` | `CustomerDto` | `201` (+ `Location` header via `CreatedAtAction`) |
-| PUT | `/api/v1/customers/{customerId}` | `UpdateCustomerDto` | — | `204`, `404` |
-| PATCH | `/api/v1/customers/{customerId}` | `PatchCustomerDto` | `CustomerDto` | `200`, `404` |
-| DELETE | `/api/v1/customers/{customerId}` | — | — | `204`, `404` |
+| POST | `/api/v1/customers` | `CreateCustomerDto` | `CustomerDto` | `201` (+ `Location` header via `CreatedAtAction`), `400` |
+| PUT | `/api/v1/customers/{customerId}` | `UpdateCustomerDto` | — | `204`, `400`, `404` |
+| PATCH | `/api/v1/customers/{customerId}` | `PatchCustomerDto` | `CustomerDto` | `200`, `400`, `404` |
+| DELETE | `/api/v1/customers/{customerId}` | — | — | `204`, `404`, `409` |
 | GET | `/api/v1/customers/{customerId}/orders` | — | `CustomerOrderDto[]` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/orders/{orderId}` | — | `CustomerOrderDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/summary` | — | `CustomerSummaryDto` | `200`, `404` |
@@ -48,6 +48,36 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 | GET | `/api/v1/customers/{customerId}/rewards` | — | `CustomerRewardsDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/addresses` | — | `CustomerAddressDto[]` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/addresses/{addressId}` | — | `CustomerAddressDto` | `200`, `404` |
+
+### Request validation — `400`
+
+`POST` and `PUT` require `firstName`, `lastName` and `emailAddress`; all three reject empty and
+whitespace-only values, not just missing ones. `emailAddress` must look like an email. Every string
+field is length-capped to its real column width (`firstName`/`middleName`/`lastName`/`emailAddress`
+50, `companyName` 128). A violation is a `400` with `ValidationProblemDetails`, produced by
+`[ApiController]` before the action body runs.
+
+`PATCH` applies the same length and format rules but requires nothing — `null` means "leave this
+field alone". A consequence worth knowing: `PATCH` therefore **cannot clear** `middleName` or
+`companyName` back to null. Use `PUT` to replace the whole record.
+
+These caps are not belt-and-braces. EF's `HasMaxLength` is a mapping hint, not a client-side check,
+so before this validation existed a too-long value reached SQL Server and came back as an unhandled
+`500`, while a body of `{}` created a customer with an empty name and email and returned `201`.
+
+### Deleting a customer — `409`
+
+`DELETE /api/v1/customers/{customerId}` returns **`409 Conflict`** when anything still references
+the customer — an address, a rewards tier, an order, or a recommendation.
+
+In practice that is **every customer in this database**. All 847 have a
+`SalesIntelligence.CustomerRecommendations` row, and every foreign key is `NO_ACTION`, so `204` is
+reachable only for a customer created through this API that has nothing attached to it yet. That's
+intended: the constraints are what stop a customer evaporating while order history still points at
+them. See `docs/adr/0009-customer-delete-refuses-rather-than-cascades.md`.
+
+The `409` body is a generic `ProblemDetails` — the SQL constraint detail goes to the log, not to the
+caller.
 
 ### Search — `GET /api/v1/customers/search?q=<term>`
 
