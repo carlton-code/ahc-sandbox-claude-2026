@@ -17,11 +17,11 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
   not an empty response.
 - No authentication/authorization is configured yet — every endpoint below is open (see
   `docs/adr/` if an ADR exists for when that changes, or `ReadMe-Api.md` for the current gap).
-- No model-validation attributes (`[Required]`, etc.) are present on any **DTO** today, so the
-  framework won't return `400` for a structurally-valid-but-semantically-wrong payload (e.g. an
-  empty `FirstName`) — only malformed JSON triggers a framework-level `400`. The sole exception is
-  `search`'s `q` **query parameter**, which is `[Required]`; that both marks it required in the
-  OpenAPI document and lets the framework return the `400` itself.
+- The write-request DTOs (`CreateCustomerDto`, `UpdateCustomerDto`, `PatchCustomerDto`) carry
+  model-validation attributes (`[Required]`, `[StringLength]`, `[EmailAddress]`), and `search`'s
+  `q` **query parameter** is `[Required]` — `[ApiController]` turns a violation into a `400`
+  before the action body runs, and the attributes mark the constraints in the OpenAPI document.
+  See "Request validation — `400`" below for the exact rules per endpoint.
 - A `400` returns a `ValidationProblemDetails` body — a `ProblemDetails` plus an `errors` map
   keyed by parameter name.
 - **Query parameters** are called out inline in the Path column (`?q=<term>`) rather than getting
