@@ -2,6 +2,7 @@ using AHC.Sandbox.Application.Customers.Dtos;
 using AHC.Sandbox.Data.Context;
 using AHC.Sandbox.Data.Repositories;
 using AHC.Sandbox.IntegrationTests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace AHC.Sandbox.IntegrationTests.Customers;
 
@@ -13,6 +14,11 @@ namespace AHC.Sandbox.IntegrationTests.Customers;
 /// </summary>
 public class CustomerWriteRepositoryTests
 {
+    // Orlando Gee. Has no address, no order and no rewards tier, but does have a
+    // SalesIntelligence.CustomerRecommendations row — as do all 847 customers — so he is not
+    // deletable. See ADR-0009.
+    private const int KnownSeededCustomerId = 1;
+
     private AdventureWorksLtDbContext _dbContext = null!;
     private CustomerWriteRepository _repository = null!;
     private readonly List<int> _createdCustomerIds = new();
@@ -153,5 +159,39 @@ public class CustomerWriteRepositoryTests
         var result = await _repository.DeleteAsync(999999);
 
         Assert.That(result, Is.False);
+    }
+
+    // The case the rest of this file structurally cannot reach. Every other delete test uses a
+    // customer created seconds earlier, which is the only kind with no dependent rows — so they all
+    // pass while DELETE was returning 500 for all 847 real customers (see ADR-0009).
+    //
+    // Every FK in this database is NO_ACTION and every seeded customer is referenced by something
+    // (customer 1 has no address, no order and no rewards tier, but does have a
+    // SalesIntelligence.CustomerRecommendations row), so this must throw. The API turns it into a
+    // 409 via DatabaseConflictExceptionHandler; at this layer it's still the raw EF exception.
+    [Test]
+    public void DeleteAsync_SeededCustomerWithDependentRows_ThrowsRatherThanDeleting()
+    {
+        Assert.ThrowsAsync<DbUpdateException>(async () =>
+            await _repository.DeleteAsync(KnownSeededCustomerId));
+    }
+
+    [Test]
+    public async Task DeleteAsync_SeededCustomerWithDependentRows_LeavesTheCustomerIntact()
+    {
+        try
+        {
+            await _repository.DeleteAsync(KnownSeededCustomerId);
+        }
+        catch (DbUpdateException)
+        {
+            // Expected — asserted in the test above. What matters here is the row surviving.
+        }
+
+        using var verifyContext = DbContextTestFactory.Create();
+        var readRepository = new CustomerReadRepository(verifyContext);
+        var stillThere = await readRepository.GetByIdAsync(KnownSeededCustomerId);
+
+        Assert.That(stillThere, Is.Not.Null);
     }
 }

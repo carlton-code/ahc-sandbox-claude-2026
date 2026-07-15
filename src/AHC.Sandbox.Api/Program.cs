@@ -1,3 +1,4 @@
+using AHC.Sandbox.Api.Infrastructure;
 using AHC.Sandbox.Application;
 using AHC.Sandbox.Data;
 using AHC.Sandbox.Infrastructure;
@@ -49,7 +50,16 @@ namespace AHC.Sandbox.Api
             builder.Services.AddData(builder.Configuration);
             builder.Services.AddInfrastructure(builder.Configuration);
 
+            // AddProblemDetails supplies the IProblemDetailsService the handler writes through, and
+            // gives unhandled exceptions a ProblemDetails body instead of an empty 500.
+            builder.Services.AddProblemDetails();
+            builder.Services.AddExceptionHandler<DatabaseConflictExceptionHandler>();
+
             var app = builder.Build();
+
+            // Must come before the endpoints it protects. Handlers that return false fall through
+            // to the default 500, so this only intercepts what it recognises.
+            app.UseExceptionHandler();
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
