@@ -257,9 +257,6 @@ this database is re-provisioned.
   is accurate, and don't "fix" the data assuming the values are wrong.
 - **295 of 847 customers have no tier row at all.** A customer with no tier is a normal state, not
   an error — read with a `LEFT JOIN` from `SalesLT.Customer`, never an inner join.
-- `SalesLT.usp_GetCustomerByID` and `SalesLT.usp_GetCustomerBySearchTerm` already join these
-  tables and flatten `RewardsLevelName`/`DiscountPercent` onto the customer row. Neither is called
-  by application code, but they're the origin of the tier semantics this codebase follows.
 
 The `SalesIntelligence` tables still have no Domain entity, Application DTO, repository, or
 controller. Building an endpoint over any of them is a brand-new vertical slice (see

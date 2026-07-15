@@ -18,15 +18,11 @@ Building the `GET /api/v1/customers/{id}/rewards` endpoint forced the question, 
 shape depends on the answer: one tier means a single flat DTO, many tiers means an array.
 
 Its two-FK-columns-no-payload shape reads like a classic many-to-many bridge table, which pulls
-toward the composite key `(CustomerId, RewardsLevelId)`. Three things argue against that reading:
+toward the composite key `(CustomerId, RewardsLevelId)`. Two things argue against that reading:
 
 1. **A rewards tier is mutually exclusive by nature.** Holding Gold and Bronze simultaneously
    isn't a state the business has a meaning for.
-2. **Two existing stored procedures already assume one tier per customer.**
-   `SalesLT.usp_GetCustomerByID` and `SalesLT.usp_GetCustomerBySearchTerm` (2022) both
-   `LEFT JOIN` through this table onto a customer row. A second tier row for one customer would
-   silently duplicate that customer in both result sets — a live latent bug, not a hypothetical.
-3. **There is no history column.** No effective date, no `ModifiedDate`. If the table were meant
+2. **There is no history column.** No effective date, no `ModifiedDate`. If the table were meant
    to record tier changes over time, there'd be no way to tell which of two rows was current.
 
 The realistic alternatives were: enforce the invariant in the schema; enforce it defensively in
@@ -54,8 +50,6 @@ enforces at most one tier per customer.
   It does still check for a second row and throw an `InvalidOperationException` naming this ADR
   if it finds one — not because the constraint is expected to fail, but because the failure mode
   if it's ever missing (silently returning an arbitrary tier) is worse than a loud error.
-- The two existing stored procedures are protected from the duplicate-customer-row bug described
-  above. This ADR fixes latent database code, not just new application code.
 - The table converts from a heap to a clustered index on `CustomerId`, which is the lookup
   predicate every rewards read uses. A small, free performance win.
 - **Assigning tiers is now constrained.** A future `PUT /rewards` must be an upsert
