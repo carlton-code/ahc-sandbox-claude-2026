@@ -49,7 +49,9 @@ Connects to a SQL Server instance running AdventureWorksLT — connection string
 `appsettings.Development.json`. There's no EF migrations tooling in this solution; the
 `DbContext` maps onto an existing database rather than creating/versioning one.
 
-Beyond the stock `SalesLT` schema, this particular database also has:
+Beyond the stock `SalesLT` schema, this database has two schemas that are custom to this project
+— they don't exist in Microsoft's published sample, so you won't get them from a normal
+AdventureWorksLT restore:
 
 - **`SalesIntelligence`** schema — `Bundle`, `BundleProduct`, `ProductRecommendations`,
   `CustomerRecommendations`
@@ -67,17 +69,37 @@ on top of the public sample.
 
 ## Running it
 
+You'll need:
+
+- the **.NET 10 SDK**
+- **SQL Server** hosting this project's copy of AdventureWorksLT, reachable via
+  `ConnectionStrings:AdventureWorksLt` (see [Database](#database) above). A stock AdventureWorksLT
+  restore is **not** enough on its own: this database has diverged from the public sample — the
+  two custom schemas, two extra `SalesLT` columns, dropped password columns (ADR-0007), and an
+  added primary key (ADR-0008). The two ADRs record their DDL, but there's currently no script
+  that recreates the custom schemas from scratch.
+- **Redis**, for the customer cache — Development expects it at `localhost:6379`
+  (`appsettings.Development.json`). Redis being *down* is tolerated: the API still starts and
+  serves requests, with reads falling back to the database. Only an empty `Redis:Configuration`
+  setting stops startup, by design.
+
 ```
 dotnet build
 dotnet run --project src/AHC.Sandbox.Api
 ```
 
-In Development, Swagger UI is available at `/swagger` on the running host, backed by the
-generated OpenAPI document at `/openapi/v1.json`. Tests use NUnit:
+The API starts on `https://localhost:7143` (from `launchSettings.json`) in the Development
+environment, where Swagger UI is available at `/swagger`, backed by the generated OpenAPI
+document at `/openapi/v1.json`. `src/AHC.Sandbox.Api/AHC.Sandbox.Api.http` has ready-made
+requests for every kind of endpoint.
 
 ```
 dotnet test
 ```
+
+runs both NUnit test projects. `AHC.Sandbox.IntegrationTests` talks to the real SQL Server and
+Redis above, so it fails without them — use `dotnet test tests/AHC.Sandbox.UnitTests` for the
+fast, infrastructure-free suite.
 
 ## Working with Claude Code on this project
 

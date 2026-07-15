@@ -104,6 +104,11 @@ email. See docs/database-schema.md's known-gotcha note.
 Everyday branches target `develop` — see the branching model above. The one checklist item that
 changes for a `release/*` or `hotfix/*` branch is the last one.
 
+Several items point at `.claude/` files. Those are [Claude Code](https://claude.com/claude-code)
+helpers (see the README's "Working with Claude Code" section), but each one is a plain-English
+checklist or walkthrough — if you're not using Claude Code, open the file and run through it
+manually; the check is the same either way.
+
 - [ ] `dotnet build` succeeds with no new warnings.
 - [ ] `dotnet test` passes — both `AHC.Sandbox.UnitTests` and `AHC.Sandbox.IntegrationTests` (or
       note explicitly if integration tests were skipped because real infrastructure wasn't
