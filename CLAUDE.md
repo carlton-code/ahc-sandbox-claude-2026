@@ -50,10 +50,13 @@ resource (see `.claude/agents/api-scaffolder.md`) — `Domain/Entities/Customer.
 `Api/Controllers/CustomersController.cs`. Each layer's rule file (table above) points to the exact
 files to look at for that layer specifically.
 
-`Customer` is currently the only resource in the API. See `docs/database-schema.md` for a curated
-summary of the tables this codebase actually touches, and `.claude/skills/adventureworks-schema`
-for the full verified column-level reference across every schema if you need more than that
-summary.
+`Customer` is currently the only top-level resource in the API, but it isn't the only slice:
+customer addresses are a read-only sub-resource with their own Application/Data pieces
+(`Application/Addresses/**`, `Data/Entities/AddressEntity.cs`/`CustomerAddressEntity.cs`,
+`Data/Repositories/AddressReadRepository.cs`), exposed through `CustomersController`. See
+`docs/database-schema.md` for a curated summary of the tables this codebase actually touches, and
+`.claude/skills/adventureworks-schema` for the full verified column-level reference across every
+schema if you need more than that summary.
 
 ## Dependency injection convention
 

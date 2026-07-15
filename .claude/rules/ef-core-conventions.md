@@ -9,9 +9,10 @@ Repositories mix two techniques on purpose. **The line between them is whether t
 maps the tables involved — not whether the query has aggregates or joins.**
 
 1. **EF Core** (`AsNoTracking()` for reads) — the default, for anything over a **mapped** table.
-   `SalesLT.Customer` is the only one mapped today. See `CustomerReadRepository.GetAllAsync` /
-   `GetByIdAsync` for plain reads, and `SearchByNameAsync` for a more involved one (`EF.Functions.Like`
-   over computed concatenations, with wildcard escaping).
+   `SalesLT.Customer`, `SalesLT.Address`, and `SalesLT.CustomerAddress` are the mapped tables
+   today. See `CustomerReadRepository.GetAllAsync` / `GetByIdAsync` for plain reads,
+   `SearchByNameAsync` for a more involved one (`EF.Functions.Like` over computed concatenations,
+   with wildcard escaping), and `AddressReadRepository` for a LINQ join across two mapped tables.
 2. **Raw ADO.NET** via `_dbContext.Database.GetDbConnection()` + parameterized `DbCommand` — for
    queries against tables the `DbContext` **doesn't map**, which EF therefore can't see at all:
    `SalesLT.SalesOrderHeader` and the two `Rewards` tables. `GetRewardsAsync` in
