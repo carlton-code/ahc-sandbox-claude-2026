@@ -110,8 +110,11 @@ namespace AHC.Sandbox.UnitTests.Addresses
             Assert.That(address!.AddressId, Is.EqualTo(541));
         }
 
+        // Only the unknown-addressId miss can be tested here: FakeAddressReadRepository ignores
+        // customerId, so cross-customer scoping (a real addressId linked to a different customer)
+        // lives in the SQL and is covered by AddressReadRepositoryTests in the integration suite.
         [Test]
-        public async Task GetCustomerAddressByIdAsync_ReturnsNull_WhenAddressIsNotLinkedToCustomer()
+        public async Task GetCustomerAddressByIdAsync_ReturnsNull_WhenAddressDoesNotExist()
         {
             _addressReadRepository.Addresses.Add(CreateAddress(541));
 
