@@ -12,7 +12,7 @@ plus a `Redis` section) copied to the output directory, and `Infrastructure/Test
 `Infrastructure/DbContextTestFactory.cs`, and `Infrastructure/RedisTestFixture.cs` load it into a
 real `AdventureWorksLtDbContext` / `IConnectionMultiplexer` the same way `AHC.Sandbox.Data`'s
 `AddData` and `AHC.Sandbox.Infrastructure`'s `AddInfrastructure` do, minus DI. `Customers/`,
-`Addresses/`, and `Caching/` contain the real tests built on top of those fixtures. There is no
+`Addresses/`, `Products/`, and `Caching/` contain the real tests built on top of those fixtures. There is no
 `WebApplicationFactory<Program>`-based end-to-end `Api` test yet — add
 `Microsoft.AspNetCore.Mvc.Testing` when that's worth the setup.
 
@@ -77,6 +77,12 @@ Code that belongs here:
   against the real database, each test cleaning up its own throwaway row.
 - `Addresses/AddressReadRepositoryTests.cs` — `AddressReadRepository`'s customer-scoped address
   reads (ordering, field mapping, cross-customer scoping) against the real database.
+- `Products/ProductReadRepositoryTests.cs` — `ProductReadRepository`'s seed-based reads (column
+  mapping including the money/decimal(8,2)/datetime store types, name ordering) against the real
+  database.
+- `Products/ProductWriteRepositoryTests.cs` — `ProductWriteRepository` inserts/updates/deletes
+  against the real database, including the unique-`ProductNumber` and delete-with-order-lines
+  constraint paths, each test cleaning up its own throwaway row.
 - `Caching/RedisCustomerCacheRepositoryTests.cs` — `RedisCustomerCacheRepository` against a real
   local Redis instance (`localhost:6379`, per this project's `appsettings.json`), including the
   cache-unavailable → `CacheUnavailableException` path.
