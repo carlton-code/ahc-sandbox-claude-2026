@@ -17,11 +17,11 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
   not an empty response.
 - No authentication/authorization is configured yet — every endpoint below is open (see
   `docs/adr/` if an ADR exists for when that changes, or `ReadMe-Api.md` for the current gap).
-- The write-request DTOs (`CreateCustomerDto`, `UpdateCustomerDto`, `PatchCustomerDto`) carry
-  model-validation attributes (`[Required]`, `[StringLength]`, `[EmailAddress]`), and `search`'s
-  `q` **query parameter** is `[Required]` — `[ApiController]` turns a violation into a `400`
-  before the action body runs, and the attributes mark the constraints in the OpenAPI document.
-  See "Request validation — `400`" below for the exact rules per endpoint.
+- Write-request DTOs (`Create*`/`Update*`/`Patch*`) carry model-validation attributes
+  (`[Required]`, `[StringLength]`, `[EmailAddress]`, `[Range]`, …), and `search`'s `q`
+  **query parameter** is `[Required]` — `[ApiController]` turns a violation into a `400` before
+  the action body runs, and the attributes mark the constraints in the OpenAPI document. See each
+  resource's "Request validation — `400`" section for the exact rules.
 - A `400` returns a `ValidationProblemDetails` body — a `ProblemDetails` plus an `errors` map
   keyed by parameter name.
 - **Query parameters** are called out inline in the Path column (`?q=<term>`) rather than getting
@@ -142,3 +142,64 @@ have one `Main Office` and one `Shipping`.
 
 `GET /api/v1/customers/{customerId}/addresses/{addressId}` is scoped to the customer: a real
 `addressId` that belongs to a *different* customer returns `404`, not that customer's address.
+
+## Products — `api/v1/products`
+
+**Status:** fully implemented — `Controllers/ProductsController.cs`.
+
+| Method | Path | Request body | Response body | Status codes |
+|---|---|---|---|---|
+| GET | `/api/v1/products` | — | `ProductDto[]` | `200` |
+| GET | `/api/v1/products/{productId}` | — | `ProductDto` | `200`, `404` |
+| POST | `/api/v1/products` | `CreateProductDto` | `ProductDto` | `201` (+ `Location` header via `CreatedAtAction`), `400`, `409` |
+| PUT | `/api/v1/products/{productId}` | `UpdateProductDto` | — | `204`, `400`, `404`, `409` |
+| DELETE | `/api/v1/products/{productId}` | — | — | `204`, `404`, `409` |
+
+The list endpoint returns every product (295 seeded) ordered by `name`, then `productId`, with no
+paging — consistent with `GET /api/v1/customers`. There's no PATCH or search endpoint yet: only
+what the current use cases need (see `.claude/rules/application-conventions.md` on not
+over-scaffolding).
+
+### Request validation — `400`
+
+`POST` and `PUT` require `name`, `productNumber`, `standardCost`, `listPrice` and
+`sellStartDate`. Strings are length-capped to their real column widths (`name` 50,
+`productNumber` 25, `color` 15, `size` 5). `standardCost` and `listPrice` must be `>= 0` and
+`weight` `> 0` — `[Range]` attributes mirroring the table's CHECK constraints, so those fail as
+`400`s here rather than `409`s at the database.
+
+The required value-type fields are declared nullable-with-`[Required]` on the DTOs deliberately:
+declared non-nullable, a missing `standardCost` would silently bind to `0` (a free product, no
+error), and a missing `sellStartDate` would bind to year 0001 — outside SQL Server's `datetime`
+range — and come back as a `500`. Nullable-plus-`[Required]` turns absence into a `400`.
+
+Not validated here: `sellEndDate >= sellStartDate` is a cross-field CHECK constraint that
+single-field annotations can't express — violating it is a `409` from the database, not a `400`.
+
+### Conflicts — `409`
+
+All three mutations can return `409 Conflict` (a generic `ProblemDetails`, produced by
+`DatabaseConflictExceptionHandler` — the SQL constraint detail goes to the log, not the caller):
+
+- **`POST`/`PUT`** — a duplicate `name` or `productNumber` (both unique in `SalesLT.Product`), a
+  `productCategoryId`/`productModelId` that doesn't exist, or a `sellEndDate` earlier than
+  `sellStartDate`.
+- **`DELETE`** — anything still references the product: an order line
+  (`SalesLT.SalesOrderDetail`) or the `SalesIntelligence` bundle/recommendation tables. Most
+  seeded products are referenced, so `204` is realistic mainly for products created through this
+  API.
+
+### DTO shapes (`Application/Products/Dtos/`)
+
+- **`ProductDto`**: `productId` (int), `name`, `productNumber`, `color?`, `standardCost`
+  (decimal), `listPrice` (decimal), `size?`, `weight?` (decimal), `productCategoryId?` (int),
+  `productModelId?` (int), `sellStartDate`, `sellEndDate?`, `discontinuedDate?`, `isDiscontinued`
+  (bool — computed: `discontinuedDate != null`).
+- **`CreateProductDto`**: `name`, `productNumber`, `color?`, `standardCost`, `listPrice`, `size?`,
+  `weight?`, `productCategoryId?`, `productModelId?`, `sellStartDate`, `sellEndDate?`,
+  `discontinuedDate?`.
+- **`UpdateProductDto`**: same shape as `CreateProductDto` (full replace).
+
+The table's binary thumbnail columns (`ThumbNailPhoto`/`ThumbnailPhotoFileName`) are deliberately
+not exposed, and its non-standard `CurrentDiscount` column is not mapped — see
+`docs/database-schema.md`.

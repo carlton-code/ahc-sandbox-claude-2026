@@ -27,9 +27,10 @@ JOIN INFORMATION_SCHEMA.COLUMNS c
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME, c.ORDINAL_POSITION;
 ```
 
-Already mapped in this codebase: `SalesLT.Customer`, `SalesLT.Address` and
-`SalesLT.CustomerAddress` (see `Data/Context/AdventureWorksLtDbContext.cs` for the authoritative
-Fluent API mapping — that's a better source of truth than this file for the columns it covers).
+Already mapped in this codebase: `SalesLT.Customer`, `SalesLT.Address`,
+`SalesLT.CustomerAddress` and `SalesLT.Product` (see `Data/Context/AdventureWorksLtDbContext.cs`
+for the authoritative Fluent API mapping — that's a better source of truth than this file for the
+columns it covers).
 Read via raw SQL instead, because they're unmapped: `SalesLT.SalesOrderHeader` and the two
 `Rewards` tables (see `CustomerReadRepository.cs`).
 
@@ -109,7 +110,7 @@ because both have database defaults (unlike ADR-0007's password columns).
   reachable only through `SalesOrderHeader.ShipToAddressID`/`BillToAddressID`, which also FK onto
   this table. That blocks a future hard `DELETE` of an address.
 
-### SalesLT.Product — not used by any code
+### SalesLT.Product — mapped (`ProductEntity`)
 
 | Column | Type | Nullable |
 |---|---|---|

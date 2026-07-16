@@ -16,6 +16,8 @@ public class AdventureWorksLtDbContext : DbContext
 
     public DbSet<CustomerAddressEntity> CustomerAddresses => Set<CustomerAddressEntity>();
 
+    public DbSet<ProductEntity> Products => Set<ProductEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -129,6 +131,76 @@ public class AdventureWorksLtDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.AddressId)
                 .IsRequired();
+        });
+
+        // Product maps the catalog columns only. ThumbNailPhoto/ThumbnailPhotoFileName are
+        // deliberately left out (binary payloads don't belong on this API), and rowguid,
+        // ModifiedDate and CurrentDiscount are unmapped for the same reason as Address's above:
+        // all NOT NULL, but all carry database defaults (newid()/getdate()/0), so their absence
+        // can't break an insert. CurrentDiscount is a non-standard column real to this database —
+        // don't "correct" it away, and don't map it until a use case needs it.
+        modelBuilder.Entity<ProductEntity>(entity =>
+        {
+            entity.ToTable("Product", "SalesLT");
+
+            entity.HasKey(e => e.ProductId);
+
+            entity.Property(e => e.ProductId)
+                .HasColumnName("ProductID");
+
+            // Name is the `Name` alias type in this database, like Address's StateProvince.
+            // EF sees the underlying nvarchar(50).
+            entity.Property(e => e.Name)
+                .HasColumnName("Name")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.ProductNumber)
+                .HasColumnName("ProductNumber")
+                .HasMaxLength(25)
+                .IsRequired();
+
+            entity.Property(e => e.Color)
+                .HasColumnName("Color")
+                .HasMaxLength(15);
+
+            // The decimal and datetime columns pin their store types explicitly: these are the
+            // first non-string/int mappings in this model, and without them EF picks decimal(18,2)
+            // for decimals (warning about silent truncation) and sends DateTime parameters as
+            // datetime2 rather than the columns' actual money/decimal(8,2)/datetime types.
+            entity.Property(e => e.StandardCost)
+                .HasColumnName("StandardCost")
+                .HasColumnType("money");
+
+            entity.Property(e => e.ListPrice)
+                .HasColumnName("ListPrice")
+                .HasColumnType("money");
+
+            entity.Property(e => e.Size)
+                .HasColumnName("Size")
+                .HasMaxLength(5);
+
+            entity.Property(e => e.Weight)
+                .HasColumnName("Weight")
+                .HasColumnType("decimal(8,2)");
+
+            entity.Property(e => e.ProductCategoryId)
+                .HasColumnName("ProductCategoryID");
+
+            entity.Property(e => e.ProductModelId)
+                .HasColumnName("ProductModelID");
+
+            entity.Property(e => e.SellStartDate)
+                .HasColumnName("SellStartDate")
+                .HasColumnType("datetime");
+
+            entity.Property(e => e.SellEndDate)
+                .HasColumnName("SellEndDate")
+                .HasColumnType("datetime");
+
+            entity.Property(e => e.DiscontinuedDate)
+                .HasColumnName("DiscontinuedDate")
+                .HasColumnType("datetime");
         });
     }
 }

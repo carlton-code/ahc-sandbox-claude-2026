@@ -9,8 +9,9 @@ below).
 
 An ASP.NET Core Web API over the `SalesLT` schema of AdventureWorksLT, plus two custom schemas —
 `SalesIntelligence` and `Rewards` — that extend the sample database with product bundles,
-recommendations, and a customer rewards program. `Customer` is the only top-level resource in the
-API today, with CRUD, name-search, order-reporting, rewards, and address endpoints.
+recommendations, and a customer rewards program. The API has two top-level resources today:
+`Customer` (CRUD, name-search, order-reporting, rewards, and address endpoints) and `Product`
+(CRUD).
 
 ## Solution layout
 
