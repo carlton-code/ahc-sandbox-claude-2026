@@ -1,4 +1,5 @@
 using AHC.Sandbox.Application.Customers.Interfaces;
+using AHC.Sandbox.Application.Products.Interfaces;
 using AHC.Sandbox.Infrastructure.Caching;
 using AHC.Sandbox.Infrastructure.Configuration;
 using Microsoft.Extensions.Configuration;
@@ -35,6 +36,7 @@ namespace AHC.Sandbox.Infrastructure
             });
 
             services.AddScoped<ICustomerCacheRepository, RedisCustomerCacheRepository>();
+            services.AddScoped<IProductCacheRepository, RedisProductCacheRepository>();
 
             return services;
         }

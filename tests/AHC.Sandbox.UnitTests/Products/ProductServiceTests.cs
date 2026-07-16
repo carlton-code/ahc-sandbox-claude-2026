@@ -2,6 +2,7 @@ using AHC.Sandbox.Application.Products.Dtos;
 using AHC.Sandbox.Application.Products.Services;
 using AHC.Sandbox.Domain.Entities;
 using AHC.Sandbox.UnitTests.Products.Fakes;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AHC.Sandbox.UnitTests.Products
 {
@@ -9,6 +10,7 @@ namespace AHC.Sandbox.UnitTests.Products
     {
         private FakeProductReadRepository _readRepository = null!;
         private FakeProductWriteRepository _writeRepository = null!;
+        private FakeProductCacheRepository _cacheRepository = null!;
         private ProductService _service = null!;
 
         [SetUp]
@@ -16,7 +18,12 @@ namespace AHC.Sandbox.UnitTests.Products
         {
             _readRepository = new FakeProductReadRepository();
             _writeRepository = new FakeProductWriteRepository();
-            _service = new ProductService(_readRepository, _writeRepository);
+            _cacheRepository = new FakeProductCacheRepository();
+            _service = new ProductService(
+                _readRepository,
+                _writeRepository,
+                _cacheRepository,
+                NullLogger<ProductService>.Instance);
         }
 
         private static Product CreateProduct(
@@ -135,6 +142,50 @@ namespace AHC.Sandbox.UnitTests.Products
             Assert.That(_readRepository.GetByIdAsyncCallCount, Is.EqualTo(1));
         }
 
+        [Test]
+        public async Task GetProductByIdAsync_CacheHit_ReturnsCachedDtoWithoutHittingReadRepository()
+        {
+            var cached = new ProductDto
+            {
+                ProductId = 680,
+                Name = "HL Road Frame - Black, 58",
+                ProductNumber = "FR-R92B-58"
+            };
+            _cacheRepository.Seed(680, cached);
+
+            var result = await _service.GetProductByIdAsync(680);
+
+            Assert.That(result, Is.SameAs(cached));
+            Assert.That(_readRepository.GetByIdAsyncCallCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public async Task GetProductByIdAsync_CacheMiss_FallsThroughToReadRepositoryAndPopulatesCache()
+        {
+            _readRepository.Products.Add(CreateProduct(680));
+
+            var result = await _service.GetProductByIdAsync(680);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(_cacheRepository.SetAsyncCalled, Is.True);
+            Assert.That(_cacheRepository.Contains(680), Is.True);
+        }
+
+        // The failed cache read already proved Redis unreachable, so the service must not spend
+        // a second Redis round-trip attempting to repopulate within the same request.
+        [Test]
+        public async Task GetProductByIdAsync_CacheUnavailableOnRead_FallsBackToReadRepositoryWithoutCaching()
+        {
+            _cacheRepository.ThrowOnGet = true;
+            _readRepository.Products.Add(CreateProduct(680));
+
+            var result = await _service.GetProductByIdAsync(680);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result!.ProductId, Is.EqualTo(680));
+            Assert.That(_cacheRepository.SetAsyncCalled, Is.False);
+        }
+
         // --- CreateProductAsync ---------------------------------------------------------------
 
         [Test]
@@ -198,6 +249,26 @@ namespace AHC.Sandbox.UnitTests.Products
             Assert.That(result, Is.False);
         }
 
+        [Test]
+        public async Task UpdateProductAsync_WriteSucceeds_InvalidatesCache()
+        {
+            var result = await _service.UpdateProductAsync(680, new UpdateProductDto());
+
+            Assert.That(result, Is.True);
+            Assert.That(_cacheRepository.RemoveAsyncCalled, Is.True);
+            Assert.That(_cacheRepository.LastRemovedProductId, Is.EqualTo(680));
+        }
+
+        [Test]
+        public async Task UpdateProductAsync_WriteFails_DoesNotTouchCache()
+        {
+            _writeRepository.UpdateResult = false;
+
+            await _service.UpdateProductAsync(680, new UpdateProductDto());
+
+            Assert.That(_cacheRepository.RemoveAsyncCalled, Is.False);
+        }
+
         // --- DeleteProductAsync ---------------------------------------------------------------
 
         [Test]
@@ -217,6 +288,26 @@ namespace AHC.Sandbox.UnitTests.Products
             var result = await _service.DeleteProductAsync(999999);
 
             Assert.That(result, Is.False);
+        }
+
+        [Test]
+        public async Task DeleteProductAsync_DeleteSucceeds_InvalidatesCache()
+        {
+            var result = await _service.DeleteProductAsync(680);
+
+            Assert.That(result, Is.True);
+            Assert.That(_cacheRepository.RemoveAsyncCalled, Is.True);
+            Assert.That(_cacheRepository.LastRemovedProductId, Is.EqualTo(680));
+        }
+
+        [Test]
+        public async Task DeleteProductAsync_DeleteFails_DoesNotTouchCache()
+        {
+            _writeRepository.DeleteResult = false;
+
+            await _service.DeleteProductAsync(680);
+
+            Assert.That(_cacheRepository.RemoveAsyncCalled, Is.False);
         }
     }
 }
