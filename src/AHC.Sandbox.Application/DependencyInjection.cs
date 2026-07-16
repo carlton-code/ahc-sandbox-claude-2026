@@ -2,6 +2,8 @@
 using AHC.Sandbox.Application.Addresses.Services;
 using AHC.Sandbox.Application.Customers.Interfaces;
 using AHC.Sandbox.Application.Customers.Services;
+using AHC.Sandbox.Application.Products.Interfaces;
+using AHC.Sandbox.Application.Products.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AHC.Sandbox.Application
@@ -12,6 +14,7 @@ namespace AHC.Sandbox.Application
         {
             services.AddScoped<ICustomerService, CustomerService>();
             services.AddScoped<IAddressService, AddressService>();
+            services.AddScoped<IProductService, ProductService>();
             return services;
         }
     }
