@@ -70,25 +70,29 @@ a smaller scale:
 
 **Types:** `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `build`.
 
-**Scopes** — match the project/area touched:
+**Scopes** — name what the change is about; never repeat the type as its scope:
 
 | Scope | Area |
 |---|---|
-| `domain`, `application`, `data`, `infrastructure`, `api` | The matching `src/AHC.Sandbox.*` project |
-| `tests` | Either test project (`UnitTests`/`IntegrationTests`) |
-| `docs` | `docs/api.md`, `docs/database-schema.md`, or other non-ADR docs |
+| `domain`, `application`, `data`, `infrastructure`, `api` | Code changes (`feat`/`fix`/`refactor`/`chore`) in the matching `src/AHC.Sandbox.*` project |
+| `customer`, `product`, `address`, `rewards`, `caching`, … | `test` and `docs` commits, scoped by the resource or area they cover — `test(tests)`/`docs(docs)` say nothing |
 | `adr` | A new or superseded `docs/adr/` entry |
 | `claude` | `.claude/agents`, `.claude/commands`, `.claude/skills`, `.claude/rules`, or `CLAUDE.md` |
 | `deps` | Package version bumps (see `.claude/skills/nuget-package-audit/SKILL.md`) |
 
+For repo-level docs with no resource or layer to name, scope by the file/area instead
+(`docs(contributing)`, `docs(readme)`).
+
 **Examples:**
 
 ```
-feat(api): add <Resource> CRUD endpoints
+feat(api): add Product CRUD endpoints
 
-Builds out <Resource>Controller following the Customer vertical slice pattern.
+Builds out ProductsController following the Customer vertical slice pattern.
 
-docs(docs): update docs/api.md for the new <Resource> endpoints
+test(product): cover ProductService and the Product repositories
+
+docs(api): update docs/api.md for the new Product endpoints
 ```
 
 ```
