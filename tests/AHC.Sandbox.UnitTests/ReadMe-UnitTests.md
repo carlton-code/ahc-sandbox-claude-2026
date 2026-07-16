@@ -12,8 +12,9 @@ real infrastructure, see the sibling `AHC.Sandbox.IntegrationTests` project inst
 `Customers/Fakes/` (`FakeCustomerReadRepository`, `FakeCustomerWriteRepository`,
 `FakeCustomerCacheRepository`), `Addresses/AddressServiceTests.cs` covers `AddressService`'s
 not-found/empty-list semantics against `Addresses/Fakes/FakeAddressReadRepository`,
-`Products/ProductServiceTests.cs` covers `ProductService`'s mapping and write pass-through against
-`Products/Fakes/`, and `Domain/CustomerTests.cs` / `Domain/AddressTests.cs` /
+`Products/ProductServiceTests.cs` covers `ProductService`'s mapping, write pass-through, and
+cache-aside/invalidation behavior against `Products/Fakes/`, and
+`Domain/CustomerTests.cs` / `Domain/AddressTests.cs` /
 `Domain/ProductTests.cs` cover the `Domain` computed properties. Adding more coverage as
 resources get built out is expected, not optional.
 

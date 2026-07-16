@@ -20,7 +20,7 @@ recommendations, and a customer rewards program. The API has two top-level resou
 | `src/AHC.Sandbox.Domain` | Core business entities (`Customer`, ...). No framework dependencies. |
 | `src/AHC.Sandbox.Application` | Use cases: DTOs, service interfaces, service implementations. Depends only on `Domain`. |
 | `src/AHC.Sandbox.Data` | EF Core `DbContext`, entity mappings, repository implementations. Talks to SQL Server. |
-| `src/AHC.Sandbox.Infrastructure` | Cross-cutting technical services. Redis caching is wired into `CustomerService` (cache-aside on reads, invalidate-on-write on mutations) via `AddInfrastructure`. |
+| `src/AHC.Sandbox.Infrastructure` | Cross-cutting technical services. Redis caching is wired into `CustomerService` and `ProductService` (cache-aside on by-id reads, invalidate-on-write on mutations) via `AddInfrastructure`. |
 | `src/AHC.Sandbox.Api` | ASP.NET Core host: controllers, `Program.cs`, Swagger/OpenAPI. |
 | `tests/AHC.Sandbox.UnitTests` | Fast NUnit tests against fakes — no real database or Redis. |
 | `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure — real SQL Server (`Customers/`, `Addresses/`) and a real Redis instance (`Caching/`) today; a `WebApplicationFactory`-based end-to-end `Api` test is the remaining gap. |
@@ -79,7 +79,7 @@ You'll need:
   two custom schemas, two extra `SalesLT` columns, dropped password columns (ADR-0007), and an
   added primary key (ADR-0008). The two ADRs record their DDL, but there's currently no script
   that recreates the custom schemas from scratch.
-- **Redis**, for the customer cache — Development expects it at `localhost:6379`
+- **Redis**, for the customer and product caches — Development expects it at `localhost:6379`
   (`appsettings.Development.json`). Redis being *down* is tolerated: the API still starts and
   serves requests, with reads falling back to the database. Only an empty `Redis:Configuration`
   setting stops startup, by design.

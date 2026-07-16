@@ -11,7 +11,8 @@ Application layer without the Application layer knowing the concrete details.
 The Infrastructure layer is responsible for:
 
 - Implementing technical service interfaces defined in `Application`
-- Currently: **Redis caching** for the `Customer` resource, under `Caching/` and `Configuration/`
+- Currently: **Redis caching** for the `Customer` and `Product` resources, under `Caching/` and
+  `Configuration/`
 
 **Current state:**
 
@@ -19,16 +20,18 @@ The Infrastructure layer is responsible for:
   (`Configuration`, `UseTls`, `ConnectTimeoutMs`). `ConnectTimeoutMs` governs both the initial
   connect timeout and per-command (`SyncTimeout`/`AsyncTimeout`) — it's what bounds how much
   latency a Redis outage adds to a request before falling back to the database.
-- `Caching/RedisCustomerCacheRepository.cs` implements `ICustomerCacheRepository` (the port,
-  defined in `Application/Customers/Interfaces/`) using `StackExchange.Redis`, with `customer:{id}`
-  keys and a 5-minute absolute TTL. It catches `StackExchange.Redis.RedisException` at this
-  boundary and translates it into `CacheUnavailableException` (also defined in `Application`) —
+- `Caching/RedisCustomerCacheRepository.cs` and `Caching/RedisProductCacheRepository.cs` implement
+  `ICustomerCacheRepository` / `IProductCacheRepository` (the per-resource ports, defined in
+  `Application/Customers/Interfaces/` and `Application/Products/Interfaces/`) using
+  `StackExchange.Redis`, with `customer:{id}` / `product:{id}` keys and a 5-minute absolute TTL.
+  Each catches `StackExchange.Redis.RedisException` at this boundary and translates it into
+  `CacheUnavailableException` (shared across resources, defined in `Application/Caching/`) —
   keeping the concrete Redis exception type out of `Application` entirely, while still letting
-  `CustomerService` distinguish "the cache backend is unreachable" from a genuine bug (e.g. a
+  the consuming service distinguish "the cache backend is unreachable" from a genuine bug (e.g. a
   JSON deserialization failure, which is deliberately left unwrapped and propagates normally).
 - `DependencyInjection.cs`'s `AddInfrastructure(IConfiguration)` registers `IConnectionMultiplexer`
   as a singleton (`AbortOnConnectFail = false`, so the app still starts if Redis is unreachable at
-  boot) and `ICustomerCacheRepository` as scoped.
+  boot) and both cache repositories as scoped.
 
 See `.claude/agents/redis-cache-builder.md` for the cache-aside/invalidate-on-write pattern this
 follows, and `docs/adr/0004-redis-for-caching-over-in-memory.md` for the reasoning behind
@@ -61,8 +64,8 @@ It also references `StackExchange.Redis`.
 
 Code that belongs here:
 
-- `RedisCustomerCacheRepository` (implementing the `ICustomerCacheRepository` port defined in
-  `Application`)
+- `RedisCustomerCacheRepository` / `RedisProductCacheRepository` (implementing the per-resource
+  cache ports defined in `Application`)
 - `IConnectionMultiplexer` registration and connection configuration
 - Any future non-database external integration (email, file storage, etc.), following the same
   "implement an Application-owned port" shape
