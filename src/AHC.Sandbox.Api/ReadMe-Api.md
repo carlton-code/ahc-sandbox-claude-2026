@@ -68,8 +68,8 @@ composition root.
 Code that belongs here:
 
 - `Program.cs` — composition root and middleware pipeline
-- Controllers — `CustomersController` is the only one today (fully implemented, the reference
-  pattern to copy).
+- Controllers — `CustomersController` (the richest one, and the reference pattern to copy) and
+  `ProductsController`.
 - `Infrastructure/DatabaseConflictExceptionHandler.cs` — cross-cutting HTTP concern: translates
   database constraint violations into `409` responses instead of unhandled 500s.
 

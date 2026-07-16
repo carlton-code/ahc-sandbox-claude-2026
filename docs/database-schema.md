@@ -93,13 +93,44 @@ A customer's addresses, exposed by `GET /api/v1/customers/{id}/addresses` and
   constraint.
 - **Touched by:** `Data/Repositories/AddressReadRepository.cs`.
 
+### `SalesLT.Product`
+
+The product catalog record backing the `Product` resource (`api/v1/products`).
+
+- **Mapped by:** `ProductEntity` + the Fluent API config in
+  `Data/Context/AdventureWorksLtDbContext.cs`.
+- **Columns currently mapped:** `ProductID`, `Name`, `ProductNumber`, `Color`, `StandardCost`,
+  `ListPrice`, `Size`, `Weight`, `ProductCategoryID`, `ProductModelID`, `SellStartDate`,
+  `SellEndDate`, `DiscontinuedDate`. These are the model's first non-string/int mappings, so the
+  store types are pinned explicitly (`money`, `decimal(8,2)`, `datetime`) rather than left to
+  EF's defaults (`decimal(18,2)`, `datetime2` parameters).
+- **Deliberately unmapped:** `ThumbNailPhoto`/`ThumbnailPhotoFileName` (binary payloads don't
+  belong on this API), plus `rowguid`/`ModifiedDate`/`CurrentDiscount` — all three NOT NULL but
+  all with database defaults (`newid()`/`getdate()`/`0`), so, like Address's unmapped columns,
+  their absence can't break an insert.
+- **Known gotcha:** `CurrentDiscount` is a non-standard column (not in the public AdventureWorksLT
+  sample) — real in this database, don't "correct" it away.
+- **Known gotcha:** `Name` and `ProductNumber` are **unique** (`AK_Product_Name`,
+  `AK_Product_ProductNumber`) — a duplicate on create/update surfaces as a `409` via
+  `DatabaseConflictExceptionHandler`, not a validation `400`.
+- **Known gotcha:** `Name` is the `Name` alias type (like Address's `StateProvince`); EF maps it
+  fine as the underlying `nvarchar(50)`.
+- **CHECK constraints:** `StandardCost >= 0`, `ListPrice >= 0`, `Weight > 0` (all mirrored as
+  `[Range]` on the write DTOs → `400` at the API), and
+  `SellEndDate >= SellStartDate OR SellEndDate IS NULL` (cross-field, not mirrored — violations
+  surface as `409`).
+- **`SalesLT.SalesOrderDetail.ProductID` and the `SalesIntelligence` tables FK onto this table**,
+  so a hard `DELETE` of a referenced product returns `409`; most seeded products are referenced
+  by something.
+- **Touched by:** `Data/Repositories/ProductReadRepository.cs`, `ProductWriteRepository.cs`.
+
 ## Not in use
 
 No entity, mapping, query, or controller exists for these — nothing here counts as "in use."
 
-- **`SalesLT.ProductCategory`** — no code references this.
-- **`SalesLT.Product`** — no code references this. Has a non-standard column, `CurrentDiscount`,
-  not in the public sample.
+- **`SalesLT.ProductCategory`** — no code references this. `Product.ProductCategoryID` FKs onto
+  it, but the id is exposed as-is; nothing reads the category itself. (`SalesLT.Product` is now
+  in use — see above.)
 - The rest of `SalesLT` — `ProductModel`, `ProductDescription`, `ProductModelProductDescription`,
   `SalesOrderDetail`, and the three catalog views (`vGetAllCategories`, `vProductAndDescription`,
   `vProductModelCatalogDescription`).
