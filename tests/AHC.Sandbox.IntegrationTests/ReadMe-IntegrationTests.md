@@ -24,7 +24,8 @@ This project is responsible for:
   methods in `CustomerReadRepository` (`GetOrderSummaryAsync`, `ExecuteOrderQueryAsync`) that a
   fake repository can't meaningfully exercise, since their whole job is running real SQL
 - Testing `Infrastructure`'s Redis caching against a real Redis instance —
-  `Caching/RedisCustomerCacheRepositoryTests.cs` on top of `Infrastructure/RedisTestFixture.cs`
+  `Caching/RedisCustomerCacheRepositoryTests.cs` and `Caching/RedisProductCacheRepositoryTests.cs`
+  on top of `Infrastructure/RedisTestFixture.cs`
   (see `.claude/agents/redis-cache-builder.md` for the pattern under test)
 - Optionally, full end-to-end `Api` tests (real HTTP request → real controller → real database)
   where that's more valuable than testing a repository in isolation
@@ -83,9 +84,10 @@ Code that belongs here:
 - `Products/ProductWriteRepositoryTests.cs` — `ProductWriteRepository` inserts/updates/deletes
   against the real database, including the unique-`ProductNumber` and delete-with-order-lines
   constraint paths, each test cleaning up its own throwaway row.
-- `Caching/RedisCustomerCacheRepositoryTests.cs` — `RedisCustomerCacheRepository` against a real
-  local Redis instance (`localhost:6379`, per this project's `appsettings.json`), including the
-  cache-unavailable → `CacheUnavailableException` path.
+- `Caching/RedisCustomerCacheRepositoryTests.cs` / `RedisProductCacheRepositoryTests.cs` — the
+  Redis cache repositories against a real local Redis instance (`localhost:6379`, per this
+  project's `appsettings.json`), including the cache-unavailable → `CacheUnavailableException`
+  path.
 - End-to-end controller tests via `WebApplicationFactory<Program>`, if/when that's worth the setup.
 
 ## Goal

@@ -15,10 +15,14 @@ paths:
 
 ## Current state — Redis caching
 
-`RedisCustomerCacheRepository` implements `ICustomerCacheRepository` (the port, owned by
-`Application/Customers/Interfaces/`) for the `Customer` resource: cache-aside on
+Caching exists for two resources, one repository per Application-owned port:
+`RedisCustomerCacheRepository` (`ICustomerCacheRepository` — cache-aside on
 `CustomerService.GetCustomerByIdAsync`, invalidate-on-write on `UpdateCustomerAsync`/
-`PatchCustomerAsync`/`DeleteCustomerAsync`, `customer:{id}` keys, 5-minute absolute TTL.
+`PatchCustomerAsync`/`DeleteCustomerAsync`, `customer:{id}` keys) and
+`RedisProductCacheRepository` (`IProductCacheRepository` — the same pattern on `ProductService`,
+`product:{id}` keys). Both use a 5-minute absolute TTL. The contracts stay per-resource
+deliberately (see `.claude/agents/redis-cache-builder.md` step 6) — don't fold them into a
+generic `ICacheRepository<T>` without a third consumer forcing the question.
 
 `RedisOptions.ConnectTimeoutMs` (bound from the `Redis` appsettings section) governs both connect
 and per-command (`SyncTimeout`/`AsyncTimeout`) timeouts — kept short (1 second) deliberately,
@@ -26,12 +30,12 @@ since it directly bounds how much latency a Redis outage adds to a request befor
 `CustomerService` falls back to the database. `AbortOnConnectFail = false` on the
 `IConnectionMultiplexer` registration means the app still starts if Redis is unreachable at boot.
 
-`RedisCustomerCacheRepository` catches `StackExchange.Redis.RedisException` and translates it into
-`CacheUnavailableException` (also owned by `Application`) — this keeps the concrete Redis
-exception type from leaking into `Application`, while still letting `CustomerService` distinguish
-"the cache backend is down" (fall back to the database) from a genuine bug in cache code (e.g. a
-JSON deserialization failure), which is deliberately left unwrapped so it surfaces rather than
-being mistaken for an outage.
+Both repositories catch `StackExchange.Redis.RedisException` and translate it into
+`CacheUnavailableException` (shared across resources, owned by `Application/Caching/`) — this
+keeps the concrete Redis exception type from leaking into `Application`, while still letting the
+consuming service distinguish "the cache backend is down" (fall back to the database) from a
+genuine bug in cache code (e.g. a JSON deserialization failure), which is deliberately left
+unwrapped so it surfaces rather than being mistaken for an outage.
 
 See `.claude/agents/redis-cache-builder.md` for the cache-aside/invalidate-on-write pattern this
 follows.
