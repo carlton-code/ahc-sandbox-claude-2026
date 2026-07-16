@@ -34,5 +34,5 @@ paths:
 
 ## Current state
 
-`CustomersController.cs` is the only controller in this project and is the reference pattern to
-copy.
+`CustomersController.cs` and `ProductsController.cs` are the controllers today.
+`CustomersController.cs` is the richer of the two and the reference pattern to copy.

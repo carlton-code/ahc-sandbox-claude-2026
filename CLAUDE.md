@@ -43,15 +43,16 @@ purpose/responsibilities/design-principles for that layer.
 
 ## Reference vertical slice: Customer
 
-`Customer` is the one resource implemented end-to-end and is the pattern to copy for every new
+`Customer` is the reference vertical slice — the pattern to copy for every new
 resource (see `.claude/agents/api-scaffolder.md`) — `Domain/Entities/Customer.cs` →
 `Application/Customers/**` → `Data/Entities/CustomerEntity.cs` +
 `Data/Repositories/CustomerReadRepository.cs`/`CustomerWriteRepository.cs` →
 `Api/Controllers/CustomersController.cs`. Each layer's rule file (table above) points to the exact
 files to look at for that layer specifically.
 
-`Customer` is currently the only top-level resource in the API, but it isn't the only slice:
-customer addresses are a read-only sub-resource with their own Application/Data pieces
+The API's top-level resources today are `Customer` and `Product` (`Product` was built by copying
+this pattern; `Customer` remains the richer reference). They aren't the only slices: customer
+addresses are a read-only sub-resource with their own Application/Data pieces
 (`Application/Addresses/**`, `Data/Entities/AddressEntity.cs`/`CustomerAddressEntity.cs`,
 `Data/Repositories/AddressReadRepository.cs`), exposed through `CustomersController`. See
 `docs/database-schema.md` for a curated summary of the tables this codebase actually touches, and
