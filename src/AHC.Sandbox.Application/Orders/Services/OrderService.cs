@@ -14,9 +14,9 @@ namespace AHC.Sandbox.Application.Orders.Services
             _orderReadRepository = orderReadRepository;
         }
 
-        public async Task<IReadOnlyCollection<OrderDto>> GetOrdersAsync(CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyCollection<OrderDto>> GetOrdersAsync(int? customerId = null, CancellationToken cancellationToken = default)
         {
-            var orders = await _orderReadRepository.GetAllAsync(cancellationToken);
+            var orders = await _orderReadRepository.GetAllAsync(customerId, cancellationToken);
 
             return orders
                 .Select(MapOrder)

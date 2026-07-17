@@ -11,13 +11,9 @@ namespace AHC.Sandbox.UnitTests.Customers.Fakes
     {
         public List<Customer> Customers { get; } = new();
 
-        public IReadOnlyCollection<CustomerOrderDto> OrdersToReturn { get; set; } = Array.Empty<CustomerOrderDto>();
-        public IReadOnlyCollection<CustomerOrderDto> RecentOrdersToReturn { get; set; } = Array.Empty<CustomerOrderDto>();
         public IReadOnlyCollection<Customer> SearchResultsToReturn { get; set; } = Array.Empty<Customer>();
 
         public int GetByIdAsyncCallCount { get; private set; }
-        public bool GetOrdersByCustomerIdAsyncCalled { get; private set; }
-        public bool GetRecentOrdersAsyncCalled { get; private set; }
         public string? LastSearchTerm { get; private set; }
 
         public Task<IReadOnlyCollection<Customer>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -37,23 +33,8 @@ namespace AHC.Sandbox.UnitTests.Customers.Fakes
             return Task.FromResult(SearchResultsToReturn);
         }
 
-        public Task<IReadOnlyCollection<CustomerOrderDto>> GetOrdersByCustomerIdAsync(int customerId, CancellationToken cancellationToken = default)
-        {
-            GetOrdersByCustomerIdAsyncCalled = true;
-            return Task.FromResult(OrdersToReturn);
-        }
-
-        public Task<CustomerOrderDto?> GetOrderByIdAsync(int customerId, int orderId, CancellationToken cancellationToken = default)
-            => Task.FromResult<CustomerOrderDto?>(null);
-
         public Task<CustomerSummaryDto?> GetSummaryAsync(int customerId, CancellationToken cancellationToken = default)
             => Task.FromResult<CustomerSummaryDto?>(null);
-
-        public Task<IReadOnlyCollection<CustomerOrderDto>> GetRecentOrdersAsync(int customerId, int count = 5, CancellationToken cancellationToken = default)
-        {
-            GetRecentOrdersAsyncCalled = true;
-            return Task.FromResult(RecentOrdersToReturn);
-        }
 
         public Task<CustomerOrderSummaryDto?> GetOrderSummaryAsync(int customerId, CancellationToken cancellationToken = default)
             => Task.FromResult<CustomerOrderSummaryDto?>(null);

@@ -139,38 +139,9 @@ namespace AHC.Sandbox.Application.Customers.Services
             return deleted;
         }
 
-        public async Task<IReadOnlyCollection<CustomerOrderDto>?> GetCustomerOrdersAsync(int customerId, CancellationToken cancellationToken = default)
-        {
-            var customer = await _customerReadRepository.GetByIdAsync(customerId, cancellationToken);
-
-            if (customer is null)
-            {
-                return null;
-            }
-
-            return await _customerReadRepository.GetOrdersByCustomerIdAsync(customerId, cancellationToken);
-        }
-
-        public Task<CustomerOrderDto?> GetCustomerOrderByIdAsync(int customerId, int orderId, CancellationToken cancellationToken = default)
-        {
-            return _customerReadRepository.GetOrderByIdAsync(customerId, orderId, cancellationToken);
-        }
-
         public Task<CustomerSummaryDto?> GetCustomerSummaryAsync(int customerId, CancellationToken cancellationToken = default)
         {
             return _customerReadRepository.GetSummaryAsync(customerId, cancellationToken);
-        }
-
-        public async Task<IReadOnlyCollection<CustomerOrderDto>?> GetCustomerRecentOrdersAsync(int customerId, CancellationToken cancellationToken = default)
-        {
-            var customer = await _customerReadRepository.GetByIdAsync(customerId, cancellationToken);
-
-            if (customer is null)
-            {
-                return null;
-            }
-
-            return await _customerReadRepository.GetRecentOrdersAsync(customerId, cancellationToken: cancellationToken);
         }
 
         public Task<CustomerOrderSummaryDto?> GetCustomerOrderSummaryAsync(int customerId, CancellationToken cancellationToken = default)

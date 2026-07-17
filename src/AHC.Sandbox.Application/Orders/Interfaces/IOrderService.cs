@@ -4,7 +4,7 @@ namespace AHC.Sandbox.Application.Orders.Interfaces
 {
     public interface IOrderService
     {
-        Task<IReadOnlyCollection<OrderDto>> GetOrdersAsync(CancellationToken cancellationToken = default);
+        Task<IReadOnlyCollection<OrderDto>> GetOrdersAsync(int? customerId = null, CancellationToken cancellationToken = default);
         Task<OrderWithLinesDto?> GetOrderByIdAsync(int orderId, CancellationToken cancellationToken = default);
     }
 }

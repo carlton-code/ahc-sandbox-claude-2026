@@ -296,50 +296,5 @@ namespace AHC.Sandbox.UnitTests.Customers
             Assert.That(_cacheRepository.RemoveAsyncCalled, Is.False);
         }
 
-        // --- GetCustomerOrdersAsync / GetCustomerRecentOrdersAsync -----------------------------
-
-        [Test]
-        public async Task GetCustomerOrdersAsync_CustomerDoesNotExist_ReturnsNullWithoutCallingOrdersRepository()
-        {
-            var result = await _service.GetCustomerOrdersAsync(999);
-
-            Assert.That(result, Is.Null);
-            Assert.That(_readRepository.GetOrdersByCustomerIdAsyncCalled, Is.False);
-        }
-
-        [Test]
-        public async Task GetCustomerOrdersAsync_CustomerExists_ReturnsOrdersFromRepository()
-        {
-            _readRepository.Customers.Add(CreateCustomer(1));
-            var orders = new[] { new CustomerOrderDto { OrderId = 100 } };
-            _readRepository.OrdersToReturn = orders;
-
-            var result = await _service.GetCustomerOrdersAsync(1);
-
-            Assert.That(result, Is.SameAs(orders));
-            Assert.That(_readRepository.GetOrdersByCustomerIdAsyncCalled, Is.True);
-        }
-
-        [Test]
-        public async Task GetCustomerRecentOrdersAsync_CustomerDoesNotExist_ReturnsNullWithoutCallingOrdersRepository()
-        {
-            var result = await _service.GetCustomerRecentOrdersAsync(999);
-
-            Assert.That(result, Is.Null);
-            Assert.That(_readRepository.GetRecentOrdersAsyncCalled, Is.False);
-        }
-
-        [Test]
-        public async Task GetCustomerRecentOrdersAsync_CustomerExists_ReturnsRecentOrdersFromRepository()
-        {
-            _readRepository.Customers.Add(CreateCustomer(1));
-            var orders = new[] { new CustomerOrderDto { OrderId = 200 } };
-            _readRepository.RecentOrdersToReturn = orders;
-
-            var result = await _service.GetCustomerRecentOrdersAsync(1);
-
-            Assert.That(result, Is.SameAs(orders));
-            Assert.That(_readRepository.GetRecentOrdersAsyncCalled, Is.True);
-        }
     }
 }

@@ -22,8 +22,7 @@ namespace AHC.Sandbox.Application.Addresses.Services
             CancellationToken cancellationToken = default)
         {
             // The address query alone can't tell "no such customer" from "customer has no
-            // addresses" — both return zero rows — so the customer is probed first. This mirrors
-            // CustomerService.GetCustomerOrdersAsync.
+            // addresses" — both return zero rows — so the customer is probed first.
             var customer = await _customerReadRepository.GetByIdAsync(customerId, cancellationToken);
 
             if (customer is null)

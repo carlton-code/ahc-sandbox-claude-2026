@@ -93,65 +93,6 @@ public class CustomerReadRepository : ICustomerReadRepository
             .ToArray();
     }
 
-    public Task<IReadOnlyCollection<CustomerOrderDto>> GetOrdersByCustomerIdAsync(
-        int customerId,
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT
-                SalesOrderID,
-                CustomerID,
-                SalesOrderNumber,
-                OrderDate,
-                ShipDate,
-                SubTotal,
-                TaxAmt,
-                Freight,
-                TotalDue
-            FROM SalesLT.SalesOrderHeader
-            WHERE CustomerID = @customerId
-            ORDER BY OrderDate DESC, SalesOrderID DESC;
-            """;
-
-        return ExecuteOrderQueryAsync(
-            sql,
-            command => AddParameter(command, "@customerId", customerId),
-            cancellationToken);
-    }
-
-    public async Task<CustomerOrderDto?> GetOrderByIdAsync(
-        int customerId,
-        int orderId,
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT
-                SalesOrderID,
-                CustomerID,
-                SalesOrderNumber,
-                OrderDate,
-                ShipDate,
-                SubTotal,
-                TaxAmt,
-                Freight,
-                TotalDue
-            FROM SalesLT.SalesOrderHeader
-            WHERE CustomerID = @customerId
-                AND SalesOrderID = @orderId;
-            """;
-
-        var orders = await ExecuteOrderQueryAsync(
-            sql,
-            command =>
-            {
-                AddParameter(command, "@customerId", customerId);
-                AddParameter(command, "@orderId", orderId);
-            },
-            cancellationToken);
-
-        return orders.FirstOrDefault();
-    }
-
     public async Task<CustomerSummaryDto?> GetSummaryAsync(
         int customerId,
         CancellationToken cancellationToken = default)
@@ -174,41 +115,12 @@ public class CustomerReadRepository : ICustomerReadRepository
         };
     }
 
-    public Task<IReadOnlyCollection<CustomerOrderDto>> GetRecentOrdersAsync(
-        int customerId,
-        int count = 5,
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT TOP (@count)
-                SalesOrderID,
-                CustomerID,
-                SalesOrderNumber,
-                OrderDate,
-                ShipDate,
-                SubTotal,
-                TaxAmt,
-                Freight,
-                TotalDue
-            FROM SalesLT.SalesOrderHeader
-            WHERE CustomerID = @customerId
-            ORDER BY OrderDate DESC, SalesOrderID DESC;
-            """;
-
-        return ExecuteOrderQueryAsync(
-            sql,
-            command =>
-            {
-                AddParameter(command, "@customerId", customerId);
-                AddParameter(command, "@count", Math.Max(count, 1));
-            },
-            cancellationToken);
-    }
-
     public async Task<CustomerOrderSummaryDto?> GetOrderSummaryAsync(
         int customerId,
         CancellationToken cancellationToken = default)
     {
+        // The aggregate below can't tell "no such customer" from "customer with no orders" —
+        // both produce an empty group — so the existence probe decides which is which.
         var customerExists = await _dbContext.Customers
             .AsNoTracking()
             .AnyAsync(c => c.CustomerId == customerId, cancellationToken);
@@ -218,62 +130,35 @@ public class CustomerReadRepository : ICustomerReadRepository
             return null;
         }
 
-        const string sql = """
-            SELECT
-                COUNT(1) AS OrderCount,
-                COALESCE(SUM(SubTotal), 0) AS SubTotal,
-                COALESCE(SUM(TaxAmt), 0) AS TaxAmount,
-                COALESCE(SUM(Freight), 0) AS FreightAmount,
-                COALESCE(SUM(TotalDue), 0) AS TotalDue,
-                MIN(OrderDate) AS FirstOrderDate,
-                MAX(OrderDate) AS MostRecentOrderDate
-            FROM SalesLT.SalesOrderHeader
-            WHERE CustomerID = @customerId;
-            """;
-
-        var connection = _dbContext.Database.GetDbConnection();
-        var shouldCloseConnection = connection.State != ConnectionState.Open;
-
-        if (shouldCloseConnection)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        try
-        {
-            using var command = connection.CreateCommand();
-            command.CommandText = sql;
-            AddParameter(command, "@customerId", customerId);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+        var summary = await _dbContext.SalesOrderHeaders
+            .AsNoTracking()
+            .Where(o => o.CustomerId == customerId)
+            .GroupBy(o => o.CustomerId)
+            .Select(g => new CustomerOrderSummaryDto
             {
-                return new CustomerOrderSummaryDto
-                {
-                    CustomerId = customerId
-                };
-            }
+                CustomerId = g.Key,
+                OrderCount = g.Count(),
+                SubTotal = g.Sum(o => o.SubTotal),
+                TaxAmount = g.Sum(o => o.TaxAmt),
+                FreightAmount = g.Sum(o => o.Freight),
+                TotalDue = g.Sum(o => o.TotalDue),
+                FirstOrderDate = g.Min(o => o.OrderDate),
+                MostRecentOrderDate = g.Max(o => o.OrderDate)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
-            return new CustomerOrderSummaryDto
-            {
-                CustomerId = customerId,
-                OrderCount = Convert.ToInt32(reader["OrderCount"]),
-                SubTotal = Convert.ToDecimal(reader["SubTotal"]),
-                TaxAmount = Convert.ToDecimal(reader["TaxAmount"]),
-                FreightAmount = Convert.ToDecimal(reader["FreightAmount"]),
-                TotalDue = Convert.ToDecimal(reader["TotalDue"]),
-                FirstOrderDate = reader["FirstOrderDate"] is DBNull ? null : Convert.ToDateTime(reader["FirstOrderDate"]),
-                MostRecentOrderDate = reader["MostRecentOrderDate"] is DBNull ? null : Convert.ToDateTime(reader["MostRecentOrderDate"])
-            };
-        }
-        finally
+        // A customer with no orders yields no group at all, where the old raw aggregate
+        // (COALESCE(SUM(...), 0)) returned a zeroed row — keep that shape. The 0.0000m scale
+        // matters: money sums come back scale-4, so a plain 0m would serialize as "0" instead
+        // of "0.0000" and change the JSON for every customer without orders.
+        return summary ?? new CustomerOrderSummaryDto
         {
-            if (shouldCloseConnection)
-            {
-                await connection.CloseAsync();
-            }
-        }
+            CustomerId = customerId,
+            SubTotal = 0.0000m,
+            TaxAmount = 0.0000m,
+            FreightAmount = 0.0000m,
+            TotalDue = 0.0000m
+        };
     }
 
     public async Task<CustomerRewardsDto?> GetRewardsAsync(
@@ -338,56 +223,6 @@ public class CustomerReadRepository : ICustomerReadRepository
             }
 
             return rewards;
-        }
-        finally
-        {
-            if (shouldCloseConnection)
-            {
-                await connection.CloseAsync();
-            }
-        }
-    }
-
-    private async Task<IReadOnlyCollection<CustomerOrderDto>> ExecuteOrderQueryAsync(
-        string sql,
-        Action<DbCommand> configureCommand,
-        CancellationToken cancellationToken)
-    {
-        var connection = _dbContext.Database.GetDbConnection();
-        var shouldCloseConnection = connection.State != ConnectionState.Open;
-
-        if (shouldCloseConnection)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        try
-        {
-            using var command = connection.CreateCommand();
-            command.CommandText = sql;
-            configureCommand(command);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            var orders = new List<CustomerOrderDto>();
-
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                orders.Add(new CustomerOrderDto
-                {
-                    OrderId = Convert.ToInt32(reader["SalesOrderID"]),
-                    CustomerId = Convert.ToInt32(reader["CustomerID"]),
-                    OrderNumber = Convert.ToString(reader["SalesOrderNumber"]) ?? string.Empty,
-                    OrderDate = Convert.ToDateTime(reader["OrderDate"]),
-                    ShipDate = reader["ShipDate"] is DBNull ? null : Convert.ToDateTime(reader["ShipDate"]),
-                    SubTotal = Convert.ToDecimal(reader["SubTotal"]),
-                    TaxAmount = Convert.ToDecimal(reader["TaxAmt"]),
-                    FreightAmount = Convert.ToDecimal(reader["Freight"]),
-                    TotalDue = Convert.ToDecimal(reader["TotalDue"])
-                });
-            }
-
-            return orders;
         }
         finally
         {
