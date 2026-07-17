@@ -141,29 +141,6 @@ namespace AHC.Sandbox.Api.Controllers
             return deleted ? NoContent() : NotFound();
         }
 
-        [HttpGet("{customerId:int}/orders")]
-        [ProducesResponseType<IReadOnlyCollection<CustomerOrderDto>>(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<IReadOnlyCollection<CustomerOrderDto>>> GetCustomerOrders(int customerId, CancellationToken cancellationToken)
-        {
-            var orders = await _customerService.GetCustomerOrdersAsync(customerId, cancellationToken);
-
-            return orders is null ? NotFound() : Ok(orders);
-        }
-
-        [HttpGet("{customerId:int}/orders/{orderId:int}")]
-        [ProducesResponseType<CustomerOrderDto>(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<CustomerOrderDto>> GetCustomerOrderById(
-            int customerId,
-            int orderId,
-            CancellationToken cancellationToken)
-        {
-            var order = await _customerService.GetCustomerOrderByIdAsync(customerId, orderId, cancellationToken);
-
-            return order is null ? NotFound() : Ok(order);
-        }
-
         [HttpGet("{customerId:int}/summary")]
         [ProducesResponseType<CustomerSummaryDto>(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -172,16 +149,6 @@ namespace AHC.Sandbox.Api.Controllers
             var summary = await _customerService.GetCustomerSummaryAsync(customerId, cancellationToken);
 
             return summary is null ? NotFound() : Ok(summary);
-        }
-
-        [HttpGet("{customerId:int}/recent-orders")]
-        [ProducesResponseType<IReadOnlyCollection<CustomerOrderDto>>(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<IReadOnlyCollection<CustomerOrderDto>>> GetCustomerRecentOrders(int customerId, CancellationToken cancellationToken)
-        {
-            var orders = await _customerService.GetCustomerRecentOrdersAsync(customerId, cancellationToken);
-
-            return orders is null ? NotFound() : Ok(orders);
         }
 
         [HttpGet("{customerId:int}/order-summary")]

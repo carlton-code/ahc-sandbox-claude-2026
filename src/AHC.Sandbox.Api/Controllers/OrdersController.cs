@@ -13,8 +13,12 @@ namespace AHC.Sandbox.Api.Controllers
     /// row-editor. The list returns headers only; the by-id read carries the lines.
     /// </para>
     /// <para>
-    /// Customer-scoped order views stay on <see cref="CustomersController"/>
-    /// (<c>/customers/{customerId}/orders</c>) — there's no <c>?customerId=</c> filter here.
+    /// This is the only place to read orders: the list takes an optional <c>?customerId=</c>
+    /// filter, which replaced the old <c>/customers/{customerId}/orders</c> sub-resource. Filter
+    /// semantics apply — an unknown customer (or one with no orders) is <c>200</c> with an empty
+    /// array, not <c>404</c>. The customer-centric aggregates
+    /// (<c>/customers/{customerId}/order-summary</c>, <c>/summary</c>) stay on
+    /// <see cref="CustomersController"/>.
     /// </para>
     /// </summary>
     [ApiController]
@@ -31,9 +35,12 @@ namespace AHC.Sandbox.Api.Controllers
 
         [HttpGet]
         [ProducesResponseType<IReadOnlyCollection<OrderDto>>(StatusCodes.Status200OK)]
-        public async Task<ActionResult<IReadOnlyCollection<OrderDto>>> GetOrders(CancellationToken cancellationToken)
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<IReadOnlyCollection<OrderDto>>> GetOrders(
+            [FromQuery] int? customerId,
+            CancellationToken cancellationToken)
         {
-            var orders = await _orderService.GetOrdersAsync(cancellationToken);
+            var orders = await _orderService.GetOrdersAsync(customerId, cancellationToken);
 
             return Ok(orders);
         }

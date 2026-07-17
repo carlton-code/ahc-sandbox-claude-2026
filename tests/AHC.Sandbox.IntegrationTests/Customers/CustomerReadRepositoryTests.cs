@@ -12,9 +12,8 @@ namespace AHC.Sandbox.IntegrationTests.Customers;
 /// Known seed data this file relies on (see <c>ReadMe-IntegrationTests.md</c> /
 /// <c>docs/database-schema.md</c> for how to re-derive these if the local database changes):
 /// - CustomerID 1 (Orlando Gee) exists and has no orders, and has no Rewards tier assigned.
-/// - CustomerID 29485 exists and has exactly one order: SalesOrderID 71782 (SO71782).
-/// - SalesOrderID 71774 belongs to a different customer (29847), giving a customer/order
-///   mismatch pair.
+/// - CustomerID 29485 exists and has exactly one order: SalesOrderID 71782 (SO71782), with
+///   SubTotal 39785.3304 / TaxAmt 3182.8264 / Freight 994.6333 / TotalDue 43962.7901.
 /// - CustomerID 999999 is unknown (max CustomerID in the seed data is 30118).
 /// - CustomerID 3 is assigned Rewards tier Silver (RewardsLevelId 1, DiscountPercent 0.0009).
 ///   Rewards.RewardsLevel holds exactly three tiers: Gold (0), Silver (1), Bronze (2). 552 of
@@ -30,8 +29,6 @@ public class CustomerReadRepositoryTests
 {
     private const int KnownCustomerIdWithoutOrders = 1;
     private const int KnownCustomerIdWithOrders = 29485;
-    private const int KnownOrderId = 71782;
-    private const int MismatchedOrderId = 71774;
     private const int UnknownCustomerId = 999999;
     private const int KnownCustomerIdWithRewardsTier = 3;
     private const int KnownCustomerIdWithoutRewardsTier = 1;
@@ -131,54 +128,6 @@ public class CustomerReadRepositoryTests
         Assert.That(customer, Is.Null);
     }
 
-    // --- GetOrdersByCustomerIdAsync ----------------------------------------------------------
-
-    [Test]
-    public async Task GetOrdersByCustomerIdAsync_CustomerWithOrders_ReturnsOrders()
-    {
-        var orders = await _repository.GetOrdersByCustomerIdAsync(KnownCustomerIdWithOrders);
-
-        Assert.That(orders, Has.Count.EqualTo(1));
-        var order = orders.Single();
-        Assert.That(order.OrderId, Is.EqualTo(KnownOrderId));
-        Assert.That(order.CustomerId, Is.EqualTo(KnownCustomerIdWithOrders));
-        Assert.That(order.OrderNumber, Is.EqualTo("SO71782"));
-    }
-
-    [Test]
-    public async Task GetOrdersByCustomerIdAsync_CustomerWithoutOrders_ReturnsEmptyCollection()
-    {
-        var orders = await _repository.GetOrdersByCustomerIdAsync(KnownCustomerIdWithoutOrders);
-
-        Assert.That(orders, Is.Empty);
-    }
-
-    // --- GetOrderByIdAsync -------------------------------------------------------------------
-
-    [Test]
-    public async Task GetOrderByIdAsync_MatchingCustomerAndOrder_ReturnsOrder()
-    {
-        var order = await _repository.GetOrderByIdAsync(KnownCustomerIdWithOrders, KnownOrderId);
-
-        Assert.That(order, Is.Not.Null);
-        Assert.That(order!.OrderId, Is.EqualTo(KnownOrderId));
-        Assert.That(order.OrderNumber, Is.EqualTo("SO71782"));
-        Assert.That(order.SubTotal, Is.EqualTo(39785.3304m));
-        Assert.That(order.TaxAmount, Is.EqualTo(3182.8264m));
-        Assert.That(order.FreightAmount, Is.EqualTo(994.6333m));
-        Assert.That(order.TotalDue, Is.EqualTo(43962.7901m));
-    }
-
-    [Test]
-    public async Task GetOrderByIdAsync_MismatchedCustomerAndOrder_ReturnsNull()
-    {
-        // MismatchedOrderId genuinely exists, but belongs to a different customer, so this must
-        // not match.
-        var order = await _repository.GetOrderByIdAsync(KnownCustomerIdWithOrders, MismatchedOrderId);
-
-        Assert.That(order, Is.Null);
-    }
-
     // --- GetSummaryAsync ---------------------------------------------------------------------
 
     [Test]
@@ -214,29 +163,6 @@ public class CustomerReadRepositoryTests
         var summary = await _repository.GetSummaryAsync(UnknownCustomerId);
 
         Assert.That(summary, Is.Null);
-    }
-
-    // --- GetRecentOrdersAsync ------------------------------------------------------------------
-
-    [Test]
-    public async Task GetRecentOrdersAsync_RespectsCountAndOrdering()
-    {
-        // The local AdventureWorksLT seed data only has a single order per customer, so this
-        // can't exercise real truncation of multiple rows down to `count` — it confirms the
-        // TOP(@count) parameterized query still returns the right (single) order for a customer
-        // that has one.
-        var orders = await _repository.GetRecentOrdersAsync(KnownCustomerIdWithOrders, count: 5);
-
-        Assert.That(orders, Has.Count.EqualTo(1));
-        Assert.That(orders.Single().OrderId, Is.EqualTo(KnownOrderId));
-    }
-
-    [Test]
-    public async Task GetRecentOrdersAsync_CustomerWithoutOrders_ReturnsEmptyCollection()
-    {
-        var orders = await _repository.GetRecentOrdersAsync(KnownCustomerIdWithoutOrders, count: 5);
-
-        Assert.That(orders, Is.Empty);
     }
 
     // --- GetOrderSummaryAsync ------------------------------------------------------------------

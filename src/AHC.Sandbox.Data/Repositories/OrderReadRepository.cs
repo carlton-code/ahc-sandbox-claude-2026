@@ -15,10 +15,16 @@ public class OrderReadRepository : IOrderReadRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyCollection<Order>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<Order>> GetAllAsync(int? customerId = null, CancellationToken cancellationToken = default)
     {
-        var entities = await _dbContext.SalesOrderHeaders
-            .AsNoTracking()
+        var query = _dbContext.SalesOrderHeaders.AsNoTracking();
+
+        if (customerId is not null)
+        {
+            query = query.Where(o => o.CustomerId == customerId);
+        }
+
+        var entities = await query
             // Newest first. Every seed order shares a single OrderDate, so the SalesOrderId
             // tiebreaker is what actually makes this ordering deterministic today.
             .OrderByDescending(o => o.OrderDate)

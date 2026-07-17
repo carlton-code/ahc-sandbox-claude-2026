@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0011 — the follow-up this ADR recorded was taken, and the grandfathered raw
+reads were removed (mostly by deleting their routes rather than migrating the queries). The
+table-mapping half of this decision stands.
 
 ## Context
 

@@ -20,9 +20,10 @@ real `AdventureWorksLtDbContext` / `IConnectionMultiplexer` the same way `AHC.Sa
 
 This project is responsible for:
 
-- Testing `Data` repository behavior against a real SQL Server — especially the raw ADO.NET
-  methods in `CustomerReadRepository` (`GetOrderSummaryAsync`, `ExecuteOrderQueryAsync`) that a
-  fake repository can't meaningfully exercise, since their whole job is running real SQL
+- Testing `Data` repository behavior against a real SQL Server — real SQL translation,
+  collation-dependent ordering, and especially the one raw-ADO.NET method in
+  `CustomerReadRepository` (`GetRewardsAsync`) that a fake repository can't meaningfully
+  exercise, since its whole job is running real SQL
 - Testing `Infrastructure`'s Redis caching against a real Redis instance —
   `Caching/RedisCustomerCacheRepositoryTests.cs` and `Caching/RedisProductCacheRepositoryTests.cs`
   on top of `Infrastructure/RedisTestFixture.cs`
@@ -72,8 +73,8 @@ Plus NUnit, `NUnit3TestAdapter`, `NUnit.Analyzers`, `Microsoft.NET.Test.Sdk`, an
 
 Code that belongs here:
 
-- `Customers/CustomerReadRepositoryTests.cs` — `CustomerReadRepository` (including the raw-SQL
-  order-summary/order-query methods) against the real database.
+- `Customers/CustomerReadRepositoryTests.cs` — `CustomerReadRepository` (including the LINQ
+  order-summary aggregate and the raw-SQL rewards join) against the real database.
 - `Customers/CustomerWriteRepositoryTests.cs` — `CustomerWriteRepository` inserts/updates/deletes
   against the real database, each test cleaning up its own throwaway row.
 - `Addresses/AddressReadRepositoryTests.cs` — `AddressReadRepository`'s customer-scoped address

@@ -24,7 +24,7 @@ the raw-SQL half is safe and correct.
   truth — flag anything that looks off rather than asserting confidently either way.
 - **Connection lifecycle**: raw-SQL methods should reuse `_dbContext.Database.GetDbConnection()`,
   check `connection.State` before opening, and close only if this call opened it — mirroring the
-  try/finally pattern in `ExecuteOrderQueryAsync`. Flag connections opened without a matching
+  try/finally pattern in `GetRewardsAsync`. Flag connections opened without a matching
   close, or closed unconditionally regardless of who opened them (that would break a caller
   running inside an existing open connection/transaction).
 - **Null handling on reads**: `DBNull` checked explicitly before `Convert.To*` on nullable
@@ -35,10 +35,9 @@ the raw-SQL half is safe and correct.
   handled it, aggregates and joins included, without losing type safety. If the query needs an
   unmapped table, it's fair to ask whether **mapping the table and writing LINQ** beats adding
   another raw query; raw SQL should be where mapping genuinely isn't worth it, not the default.
-  Note the existing raw order queries (`GetOrdersByCustomerIdAsync`, `GetOrderByIdAsync`,
-  `GetRecentOrdersAsync`, `GetOrderSummaryAsync`) are raw only because `SalesLT.SalesOrderHeader`
-  isn't mapped — they're deliberately left as-is, so don't re-flag them, but don't treat them as
-  precedent for new raw SQL either.
+  `GetRewardsAsync` (unmapped `Rewards` tables) is the only raw method today — the legacy raw
+  order queries were removed once `SalesLT.SalesOrderHeader` was mapped (ADR-0011), so any *new*
+  raw SQL over an order table is a finding, not a continuation of precedent.
 
 Report findings as a short list: file/line, the risk, and a concrete fix. If everything checks
 out, say so briefly.

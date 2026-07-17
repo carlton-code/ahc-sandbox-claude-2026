@@ -35,11 +35,11 @@ Order headers, backing the `Order` resource (`api/v1/orders`, read-only) and the
 orders/summary endpoints.
 
 - **EF-mapped** by `SalesOrderHeaderEntity` + Fluent API config in
-  `Data/Context/AdventureWorksLtDbContext.cs`, read with plain LINQ by
-  `Data/Repositories/OrderReadRepository.cs`. The four raw-ADO.NET customer-order queries in
-  `CustomerReadRepository` (`GetOrdersByCustomerIdAsync`/`GetOrderByIdAsync`/
-  `GetRecentOrdersAsync`/`GetOrderSummaryAsync`) predate the mapping and are deliberately left
-  raw — see ADR-0010; **new** order querying must be LINQ.
+  `Data/Context/AdventureWorksLtDbContext.cs`, read with plain LINQ everywhere:
+  `Data/Repositories/OrderReadRepository.cs` for the Orders endpoints and
+  `CustomerReadRepository.GetOrderSummaryAsync` (a LINQ `GroupBy` aggregate) for the customer
+  summary reports. The old raw-ADO.NET customer-order queries were removed with their routes —
+  see ADR-0011.
 - **Columns currently mapped:** `SalesOrderID`, `SalesOrderNumber`, `CustomerID`, `OrderDate`,
   `DueDate`, `ShipDate`, `Status`, `PurchaseOrderNumber`, `AccountNumber`, `ShipToAddressID`,
   `BillToAddressID`, `ShipMethod`, `SubTotal`, `TaxAmt`, `Freight`, `TotalDue`,
@@ -56,8 +56,8 @@ orders/summary endpoints.
   non-null `ShipDate`, and a null `Comment` — orderings need an id tiebreaker to be
   deterministic, and the "unshipped" branches are only reachable through unit tests.
 - **Touched by:** `Data/Repositories/OrderReadRepository.cs`;
-  `CustomerReadRepository.GetOrdersByCustomerIdAsync` /
-  `GetOrderByIdAsync` / `GetRecentOrdersAsync` / `GetOrderSummaryAsync` (legacy raw reads).
+  `CustomerReadRepository.GetOrderSummaryAsync` (LINQ aggregate backing
+  `/customers/{id}/order-summary` and `/summary`).
 
 ### `SalesLT.SalesOrderDetail`
 

@@ -11,8 +11,11 @@ namespace AHC.Sandbox.UnitTests.Orders.Fakes
     {
         public List<Order> Orders { get; } = new();
 
-        public Task<IReadOnlyCollection<Order>> GetAllAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyCollection<Order>>(Orders);
+        public Task<IReadOnlyCollection<Order>> GetAllAsync(int? customerId = null, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyCollection<Order>>(
+                customerId is null
+                    ? Orders
+                    : Orders.Where(o => o.CustomerId == customerId).ToArray());
 
         public Task<Order?> GetByIdAsync(int orderId, CancellationToken cancellationToken = default)
             => Task.FromResult(Orders.FirstOrDefault(o => o.OrderId == orderId));

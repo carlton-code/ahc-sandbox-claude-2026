@@ -47,10 +47,10 @@ The Data layer should:
     open/close-connection-in-`finally` handling, and `.claude/agents/sql-safety-reviewer.md` for
     what "safe" raw SQL looks like here.
   - When a new feature needs an unmapped table, **prefer mapping it and writing LINQ** over adding
-    another raw query. The four raw customer-order queries predate `SalesOrderHeader` being
-    mapped and are grandfathered deliberately — see
-    `docs/adr/0010-map-order-tables-keep-legacy-raw-reads.md`; don't read them as precedent that
-    aggregates require SQL, and don't extend them.
+    another raw query. `GetRewardsAsync` is the only raw method left — the legacy raw
+    customer-order queries were removed with their routes once the order tables were mapped (see
+    `docs/adr/0011-consolidate-order-reads-remove-raw-order-sql.md`); don't read raw SQL as the
+    answer for aggregates (`GetOrderSummaryAsync` is a LINQ `GroupBy` now).
 
 ## Dependencies
 
@@ -67,8 +67,8 @@ Code that belongs here:
 - `CustomerEntity` / `AddressEntity` / `CustomerAddressEntity` and future `<Resource>Entity` types
 - `CustomerReadRepository` / `CustomerWriteRepository` / `AddressReadRepository` and future
   repository implementations
-- Parameterized raw SQL for aggregate/join queries that EF can't express cleanly as a single
-  tracked-entity query
+- Parameterized raw SQL for queries over tables the `DbContext` doesn't map (today, only the
+  `Rewards` tables)
 
 Code that does **not** belong here:
 
@@ -79,8 +79,8 @@ Code that does **not** belong here:
 
 ## Goal
 
-Isolate all persistence concerns so the database can be queried efficiently (via EF or raw SQL,
-whichever fits the query) without any of that leaking into `Domain` or `Application`. See
+Isolate all persistence concerns so the database can be queried efficiently (EF over mapped
+tables; raw SQL only for unmapped ones) without any of that leaking into `Domain` or `Application`. See
 `docs/database-schema.md` for a curated summary of just the tables this project actually touches,
 `.claude/skills/adventureworks-schema/SKILL.md` for the full table/column reference across all
 three business schemas (`SalesLT`, `SalesIntelligence`, `Rewards`) this project's database has,

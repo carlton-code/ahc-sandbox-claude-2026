@@ -135,9 +135,9 @@ reference `StackExchange.Redis` or the concrete repository directly.
     eventually returns `200`.
 
 11. **Be selective about what's worth caching.** `GetCustomerByIdAsync` (single-row, read-heavy,
-    changes rarely) is a good candidate. `GetCustomerOrdersAsync`/`GetCustomerRecentOrdersAsync`
-    (naturally changing, less repeat-read benefit) are weaker candidates — don't cache
-    everything by default just because the plumbing now exists.
+    changes rarely) is a good candidate. The order list (`GetOrdersAsync`) and the customer
+    summaries (naturally changing aggregates, less repeat-read benefit) are weaker candidates —
+    don't cache everything by default just because the plumbing now exists.
 
 12. **Register the concrete `RedisCustomerCacheRepository` behind `ICustomerCacheRepository` in
     `Infrastructure/DependencyInjection.cs`**, not ad hoc in `Program.cs` — same convention as

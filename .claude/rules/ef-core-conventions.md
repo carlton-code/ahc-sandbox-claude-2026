@@ -13,9 +13,11 @@ maps the tables involved — not whether the query has aggregates or joins.**
    `SalesLT.SalesOrderHeader`, and `SalesLT.SalesOrderDetail` are the mapped tables today. See
    `CustomerReadRepository.GetAllAsync` / `GetByIdAsync` for plain reads, `SearchByNameAsync` for
    a more involved one (`EF.Functions.Like` over computed concatenations, with wildcard
-   escaping), `AddressReadRepository` for a LINQ join across two mapped tables, and
+   escaping), `AddressReadRepository` for a LINQ join across two mapped tables,
    `OrderReadRepository` for an `Include` over a parent/child pair with database-computed
-   columns (`ValueGeneratedOnAddOrUpdate()`).
+   columns (`ValueGeneratedOnAddOrUpdate()`) and an optional-filter list, and
+   `CustomerReadRepository.GetOrderSummaryAsync` for a `GroupBy` aggregate projecting into a
+   DTO.
 2. **Raw ADO.NET** via `_dbContext.Database.GetDbConnection()` + parameterized `DbCommand` — for
    queries against tables the `DbContext` **doesn't map**, which EF therefore can't see at all:
    today, only the two `Rewards` tables. `GetRewardsAsync` in `CustomerReadRepository.cs` is the
@@ -29,13 +31,12 @@ table and writing LINQ over adding another raw query.** Raw SQL is where you lan
 isn't worth it (a one-off cross-schema report, say), not the default for anything that looks
 SQL-ish.
 
-The existing raw customer-order queries (`GetOrdersByCustomerIdAsync`, `GetOrderByIdAsync`,
-`GetRecentOrdersAsync`, `GetOrderSummaryAsync`) predate `SalesLT.SalesOrderHeader` being mapped
-and are **grandfathered deliberately** — see `docs/adr/0010-map-order-tables-keep-legacy-raw-reads.md`.
-They work, they're covered by integration tests, and migrating them to LINQ is a recorded
-follow-up decision, not something to fold into other work. Don't read them as a template saying
-"aggregates mean raw SQL," and don't extend them: **new order querying goes through the mapped
-entities and LINQ** (`OrderReadRepository` is the reference).
+There are no grandfathered raw queries left: the legacy raw customer-order reads were removed
+with their routes once the order tables were mapped — see
+`docs/adr/0011-consolidate-order-reads-remove-raw-order-sql.md`. `GetRewardsAsync` is the one
+raw method in the solution, and it stays raw only because the `Rewards` tables are unmapped. All
+order querying goes through the mapped entities and LINQ (`OrderReadRepository` is the
+reference).
 
 When adding raw SQL: always parameterize (`AddParameter` helper — never string-concatenate
 input), and follow the existing open/close-connection-in-`finally` pattern rather than assuming

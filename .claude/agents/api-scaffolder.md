@@ -42,10 +42,11 @@ new services/repositories inside that layer's own `Add<Layer>()` extension metho
      `.claude/skills/adventureworks-schema` for the table shape, but verify column
      names/nullability against the actual database before trusting it blindly).
    - Repository implementations under `Data/Repositories/`. Use EF (`AsNoTracking()` for reads)
-     for simple CRUD against the mapped entity. Only drop to raw parameterized ADO.NET
-     (`_dbContext.Database.GetDbConnection()` + `DbCommand`, following the open/close-in-`finally`
-     pattern in `CustomerReadRepository.ExecuteOrderQueryAsync`) for joins/aggregates that don't
-     map cleanly to a single tracked entity — don't reach for raw SQL by default.
+     for anything over mapped tables — joins and aggregates included (see
+     `CustomerReadRepository.GetOrderSummaryAsync` for a LINQ `GroupBy` aggregate). Only drop to
+     raw parameterized ADO.NET (`_dbContext.Database.GetDbConnection()` + `DbCommand`, following
+     the open/close-in-`finally` pattern in `CustomerReadRepository.GetRewardsAsync`) for tables
+     the `DbContext` doesn't map — don't reach for raw SQL by default.
    - Register the repositories in `Data/DependencyInjection.cs`.
    - Move the table's entry in `docs/database-schema.md` from "not in use yet" to "actually in
      use today," with what's actually mapped and any gotcha you hit — that file exists precisely

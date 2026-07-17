@@ -35,8 +35,9 @@ output back.
   `Domain` invariants, `Application` service logic against fake repository interfaces
   (`ICustomerReadRepository` etc.).
 - **`tests/AHC.Sandbox.IntegrationTests`** — anything that fundamentally needs the real thing to
-  mean anything: raw ADO.NET repository methods (`CustomerReadRepository.GetOrderSummaryAsync`
-  etc.) against a real SQL Server, `Infrastructure`'s Redis caching
+  mean anything: repository methods (real SQL translation, ordering under the database's
+  collation, the raw-ADO.NET `CustomerReadRepository.GetRewardsAsync`) against a real SQL
+  Server, `Infrastructure`'s Redis caching
   (`RedisCustomerCacheRepositoryTests`), or a full end-to-end `Api` test. Connection configuration
   is already wired up via this project's own `appsettings.json` plus `Infrastructure/TestConfiguration.cs`,
   `DbContextTestFactory.cs`, and `RedisTestFixture.cs` (see `ReadMe-IntegrationTests.md`) — reuse
