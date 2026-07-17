@@ -34,5 +34,6 @@ paths:
 
 ## Current state
 
-`CustomersController.cs` and `ProductsController.cs` are the controllers today.
-`CustomersController.cs` is the richer of the two and the reference pattern to copy.
+`CustomersController.cs`, `ProductsController.cs`, and `OrdersController.cs` are the controllers
+today. `CustomersController.cs` is the richest and the reference pattern to copy;
+`OrdersController.cs` is the read-only example (two GETs, no writes by design).

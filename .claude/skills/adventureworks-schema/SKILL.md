@@ -28,11 +28,13 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME, c.ORDINAL_POSITION;
 ```
 
 Already mapped in this codebase: `SalesLT.Customer`, `SalesLT.Address`,
-`SalesLT.CustomerAddress` and `SalesLT.Product` (see `Data/Context/AdventureWorksLtDbContext.cs`
+`SalesLT.CustomerAddress`, `SalesLT.Product`, `SalesLT.SalesOrderHeader` and
+`SalesLT.SalesOrderDetail` (see `Data/Context/AdventureWorksLtDbContext.cs`
 for the authoritative Fluent API mapping — that's a better source of truth than this file for the
 columns it covers).
-Read via raw SQL instead, because they're unmapped: `SalesLT.SalesOrderHeader` and the two
-`Rewards` tables (see `CustomerReadRepository.cs`).
+Read via raw SQL instead, because they're unmapped: the two `Rewards` tables (see
+`CustomerReadRepository.cs`, which also keeps four grandfathered raw reads over the now-mapped
+`SalesOrderHeader` — see `docs/adr/0010-map-order-tables-keep-legacy-raw-reads.md`).
 
 ## SalesLT schema
 
@@ -155,7 +157,7 @@ Skip `ThumbNailPhoto`/`ThumbnailPhotoFileName` in any DTO (binary/large, not use
   `Culture`), `Culture` nchar(6) NOT NULL, `rowguid`, `ModifiedDate`. Many-to-many join between
   the two above, keyed per locale.
 
-### SalesLT.SalesOrderHeader — read via raw SQL, not EF-mapped
+### SalesLT.SalesOrderHeader — mapped (`SalesOrderHeaderEntity`)
 
 | Column | Type | Nullable |
 |---|---|---|
@@ -183,14 +185,14 @@ Skip `ThumbNailPhoto`/`ThumbnailPhotoFileName` in any DTO (binary/large, not use
 | ModifiedDate | datetime | NO |
 | TrackingNumber *(not in the public sample schema)* | varchar(18) | NO |
 
-`TotalDue` is computed in the stock schema as `SubTotal + TaxAmt + Freight` — confirm that still
-holds here before relying on it rather than reading the stored value. Only the columns
-`CustomerReadRepository.cs` already selects (`SalesOrderID`, `CustomerID`, `SalesOrderNumber`,
-`OrderDate`, `ShipDate`, `SubTotal`, `TaxAmt`, `Freight`, `TotalDue`) are currently consumed —
-extend that query rather than inventing a new one if you just need another column from the same
-table.
+`SalesOrderNumber` and `TotalDue` (`SubTotal + TaxAmt + Freight`) are **database-computed** —
+mapped with `ValueGeneratedOnAddOrUpdate()` so EF never writes them. `CreditCardApprovalCode` is
+payment data and is **never mapped or exposed**; `RevisionNumber`/`OnlineOrderFlag`/`rowguid`/
+`ModifiedDate` are unmapped (NOT NULL with database defaults). `CustomerReadRepository.cs` keeps
+four grandfathered raw reads over this table (ADR-0010) — new querying goes through
+`SalesOrderHeaderEntity` and LINQ.
 
-### SalesLT.SalesOrderDetail — not yet used anywhere in this codebase
+### SalesLT.SalesOrderDetail — mapped (`SalesOrderDetailEntity`)
 
 | Column | Type | Nullable |
 |---|---|---|
@@ -204,8 +206,9 @@ table.
 | rowguid | uniqueidentifier | NO |
 | ModifiedDate | datetime | NO |
 
-Composite PK (`SalesOrderID`, `SalesOrderDetailID`). Needed if a future endpoint exposes order
-line items.
+Composite PK (`SalesOrderID`, `SalesOrderDetailID`). `LineTotal` is **database-computed**
+(`UnitPrice * (1 - UnitPriceDiscount) * OrderQty`, `numeric(38,6)`), mapped with
+`ValueGeneratedOnAddOrUpdate()`. Exposed as `lines` on `GET /api/v1/orders/{orderId}`.
 
 ### Views (read-only, no PK — don't attempt to EF-map with `HasKey`)
 
