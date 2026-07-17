@@ -18,6 +18,10 @@ public class AdventureWorksLtDbContext : DbContext
 
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
 
+    public DbSet<SalesOrderHeaderEntity> SalesOrderHeaders => Set<SalesOrderHeaderEntity>();
+
+    public DbSet<SalesOrderDetailEntity> SalesOrderDetails => Set<SalesOrderDetailEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -201,6 +205,135 @@ public class AdventureWorksLtDbContext : DbContext
             entity.Property(e => e.DiscontinuedDate)
                 .HasColumnName("DiscontinuedDate")
                 .HasColumnType("datetime");
+        });
+
+        // SalesOrderHeader maps what the read-only Order slice serves. CreditCardApprovalCode is
+        // deliberately unmapped — payment data that must never reach the API surface — and
+        // RevisionNumber/OnlineOrderFlag/rowguid/ModifiedDate are unmapped for the usual reason:
+        // NOT NULL, but all carry database defaults, so their absence can't break an insert.
+        // TrackingNumber is a non-standard NOT NULL varchar(18) column real to this database.
+        modelBuilder.Entity<SalesOrderHeaderEntity>(entity =>
+        {
+            entity.ToTable("SalesOrderHeader", "SalesLT");
+
+            entity.HasKey(e => e.SalesOrderId);
+
+            entity.Property(e => e.SalesOrderId)
+                .HasColumnName("SalesOrderID");
+
+            // SalesOrderNumber and TotalDue are computed by the database
+            // (ISNULL('SO' + CONVERT(...), '*** ERROR ***') and SubTotal + TaxAmt + Freight).
+            // ValueGeneratedOnAddOrUpdate tells EF the database owns them: read-only today, and
+            // never to be sent in an INSERT/UPDATE if write support ever lands.
+            entity.Property(e => e.SalesOrderNumber)
+                .HasColumnName("SalesOrderNumber")
+                .HasMaxLength(25)
+                .IsRequired()
+                .ValueGeneratedOnAddOrUpdate();
+
+            entity.Property(e => e.CustomerId)
+                .HasColumnName("CustomerID");
+
+            entity.Property(e => e.OrderDate)
+                .HasColumnName("OrderDate")
+                .HasColumnType("datetime");
+
+            entity.Property(e => e.DueDate)
+                .HasColumnName("DueDate")
+                .HasColumnType("datetime");
+
+            entity.Property(e => e.ShipDate)
+                .HasColumnName("ShipDate")
+                .HasColumnType("datetime");
+
+            entity.Property(e => e.Status)
+                .HasColumnName("Status");
+
+            entity.Property(e => e.PurchaseOrderNumber)
+                .HasColumnName("PurchaseOrderNumber")
+                .HasMaxLength(25);
+
+            entity.Property(e => e.AccountNumber)
+                .HasColumnName("AccountNumber")
+                .HasMaxLength(15);
+
+            entity.Property(e => e.ShipToAddressId)
+                .HasColumnName("ShipToAddressID");
+
+            entity.Property(e => e.BillToAddressId)
+                .HasColumnName("BillToAddressID");
+
+            entity.Property(e => e.ShipMethod)
+                .HasColumnName("ShipMethod")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.SubTotal)
+                .HasColumnName("SubTotal")
+                .HasColumnType("money");
+
+            entity.Property(e => e.TaxAmt)
+                .HasColumnName("TaxAmt")
+                .HasColumnType("money");
+
+            entity.Property(e => e.Freight)
+                .HasColumnName("Freight")
+                .HasColumnType("money");
+
+            entity.Property(e => e.TotalDue)
+                .HasColumnName("TotalDue")
+                .HasColumnType("money")
+                .ValueGeneratedOnAddOrUpdate();
+
+            entity.Property(e => e.TrackingNumber)
+                .HasColumnName("TrackingNumber")
+                .HasColumnType("varchar(18)")
+                .IsRequired();
+
+            entity.Property(e => e.Comment)
+                .HasColumnName("Comment");
+
+            // No back-navigation from detail to header, per the CustomerAddress precedent —
+            // nothing reads lines in that direction.
+            entity.HasMany(e => e.Details)
+                .WithOne()
+                .HasForeignKey(d => d.SalesOrderId)
+                .IsRequired();
+        });
+
+        // rowguid/ModifiedDate unmapped here too (NOT NULL, database defaults).
+        modelBuilder.Entity<SalesOrderDetailEntity>(entity =>
+        {
+            entity.ToTable("SalesOrderDetail", "SalesLT");
+
+            entity.HasKey(e => new { e.SalesOrderId, e.SalesOrderDetailId });
+
+            entity.Property(e => e.SalesOrderId)
+                .HasColumnName("SalesOrderID");
+
+            entity.Property(e => e.SalesOrderDetailId)
+                .HasColumnName("SalesOrderDetailID")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.OrderQty)
+                .HasColumnName("OrderQty");
+
+            entity.Property(e => e.ProductId)
+                .HasColumnName("ProductID");
+
+            entity.Property(e => e.UnitPrice)
+                .HasColumnName("UnitPrice")
+                .HasColumnType("money");
+
+            entity.Property(e => e.UnitPriceDiscount)
+                .HasColumnName("UnitPriceDiscount")
+                .HasColumnType("money");
+
+            // LineTotal is database-computed: UnitPrice * (1 - UnitPriceDiscount) * OrderQty.
+            entity.Property(e => e.LineTotal)
+                .HasColumnName("LineTotal")
+                .HasColumnType("numeric(38,6)")
+                .ValueGeneratedOnAddOrUpdate();
         });
     }
 }
