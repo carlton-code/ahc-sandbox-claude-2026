@@ -9,9 +9,9 @@ below).
 
 An ASP.NET Core Web API over the `SalesLT` schema of AdventureWorksLT, plus two custom schemas —
 `SalesIntelligence` and `Rewards` — that extend the sample database with product bundles,
-recommendations, and a customer rewards program. The API has two top-level resources today:
-`Customer` (CRUD, name-search, order-reporting, rewards, and address endpoints) and `Product`
-(CRUD).
+recommendations, and a customer rewards program. The API has three top-level resources today:
+`Customer` (CRUD, name-search, order-reporting, rewards, and address endpoints), `Product`
+(CRUD), and `Order` (read-only: list and by-id with line items).
 
 ## Solution layout
 
@@ -23,7 +23,7 @@ recommendations, and a customer rewards program. The API has two top-level resou
 | `src/AHC.Sandbox.Infrastructure` | Cross-cutting technical services. Redis caching is wired into `CustomerService` and `ProductService` (cache-aside on by-id reads, invalidate-on-write on mutations) via `AddInfrastructure`. |
 | `src/AHC.Sandbox.Api` | ASP.NET Core host: controllers, `Program.cs`, Swagger/OpenAPI. |
 | `tests/AHC.Sandbox.UnitTests` | Fast NUnit tests against fakes — no real database or Redis. |
-| `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure — real SQL Server (`Customers/`, `Addresses/`) and a real Redis instance (`Caching/`) today; a `WebApplicationFactory`-based end-to-end `Api` test is the remaining gap. |
+| `tests/AHC.Sandbox.IntegrationTests` | NUnit tests against real infrastructure — real SQL Server (`Customers/`, `Addresses/`, `Products/`, `Orders/`) and a real Redis instance (`Caching/`) today; a `WebApplicationFactory`-based end-to-end `Api` test is the remaining gap. |
 
 Dependencies flow one direction: `Api` → `Application`/`Data`/`Infrastructure` → `Domain`. Each
 project has its own `ReadMe-<Project>.md` with the detailed purpose/responsibilities/design

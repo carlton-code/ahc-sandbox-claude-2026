@@ -31,17 +31,49 @@ The customer record backing the one fully-implemented resource, `Customer`.
 
 ### `SalesLT.SalesOrderHeader`
 
-Order history queried for a customer's orders/summary endpoints.
+Order headers, backing the `Order` resource (`api/v1/orders`, read-only) and the customer
+orders/summary endpoints.
 
-- **Not EF-mapped** — read via raw parameterized ADO.NET instead (see
-  `docs/adr/0002-ef-core-over-dapper.md` for why raw SQL rather than Dapper).
-- **Columns currently selected:** `SalesOrderID`, `CustomerID`, `SalesOrderNumber`, `OrderDate`,
-  `ShipDate`, `SubTotal`, `TaxAmt`, `Freight`, `TotalDue`.
-- **Known gotcha:** this table has a non-standard column, `TrackingNumber`, that isn't part of the
-  public AdventureWorksLT sample schema — it's real in this database, don't "correct" it away as
-  a typo.
-- **Touched by:** `CustomerReadRepository.GetOrdersByCustomerIdAsync` /
-  `GetOrderByIdAsync` / `GetRecentOrdersAsync` / `GetOrderSummaryAsync`.
+- **EF-mapped** by `SalesOrderHeaderEntity` + Fluent API config in
+  `Data/Context/AdventureWorksLtDbContext.cs`, read with plain LINQ by
+  `Data/Repositories/OrderReadRepository.cs`. The four raw-ADO.NET customer-order queries in
+  `CustomerReadRepository` (`GetOrdersByCustomerIdAsync`/`GetOrderByIdAsync`/
+  `GetRecentOrdersAsync`/`GetOrderSummaryAsync`) predate the mapping and are deliberately left
+  raw — see ADR-0010; **new** order querying must be LINQ.
+- **Columns currently mapped:** `SalesOrderID`, `SalesOrderNumber`, `CustomerID`, `OrderDate`,
+  `DueDate`, `ShipDate`, `Status`, `PurchaseOrderNumber`, `AccountNumber`, `ShipToAddressID`,
+  `BillToAddressID`, `ShipMethod`, `SubTotal`, `TaxAmt`, `Freight`, `TotalDue`,
+  `TrackingNumber`, `Comment`.
+- **Never map `CreditCardApprovalCode`** — payment data that must not reach the API surface.
+- **Deliberately unmapped:** `RevisionNumber`/`OnlineOrderFlag`/`rowguid`/`ModifiedDate` — all
+  NOT NULL but all with database defaults, the usual precedent.
+- **Known gotcha:** `SalesOrderNumber` and `TotalDue` are **database-computed** columns, mapped
+  with `ValueGeneratedOnAddOrUpdate()` so EF never tries to write them.
+- **Known gotcha:** this table has a non-standard column, `TrackingNumber` (`varchar(18)` NOT
+  NULL), that isn't part of the public AdventureWorksLT sample schema — it's real in this
+  database, don't "correct" it away as a typo.
+- **Known gotcha:** all 32 seed orders share one `OrderDate` (2008-06-01), have `Status` = 5, a
+  non-null `ShipDate`, and a null `Comment` — orderings need an id tiebreaker to be
+  deterministic, and the "unshipped" branches are only reachable through unit tests.
+- **Touched by:** `Data/Repositories/OrderReadRepository.cs`;
+  `CustomerReadRepository.GetOrdersByCustomerIdAsync` /
+  `GetOrderByIdAsync` / `GetRecentOrdersAsync` / `GetOrderSummaryAsync` (legacy raw reads).
+
+### `SalesLT.SalesOrderDetail`
+
+Order lines, exposed as `lines` on `GET /api/v1/orders/{orderId}`.
+
+- **EF-mapped** by `SalesOrderDetailEntity` + Fluent API config in
+  `Data/Context/AdventureWorksLtDbContext.cs`, loaded via `Include` from the header (the header
+  has a `Details` navigation; there's no back-navigation, per the CustomerAddress precedent).
+- **Columns currently mapped:** `SalesOrderID`, `SalesOrderDetailID`, `OrderQty`, `ProductID`,
+  `UnitPrice`, `UnitPriceDiscount`, `LineTotal`. `rowguid`/`ModifiedDate` unmapped as usual.
+- **Known gotcha:** **composite primary key** (`SalesOrderID`, `SalesOrderDetailID`) — the detail
+  id alone is an identity but not the key.
+- **Known gotcha:** `LineTotal` is **database-computed** (`UnitPrice * (1 - UnitPriceDiscount) *
+  OrderQty`, stored as `numeric(38,6)`), mapped with `ValueGeneratedOnAddOrUpdate()`.
+- **Touched by:** `Data/Repositories/OrderReadRepository.cs` (`GetByIdAsync` only — the list
+  endpoint reads headers only).
 
 ### `Rewards.CustomerRewardsLevel` + `Rewards.RewardsLevel`
 
@@ -132,8 +164,8 @@ No entity, mapping, query, or controller exists for these — nothing here count
   it, but the id is exposed as-is; nothing reads the category itself. (`SalesLT.Product` is now
   in use — see above.)
 - The rest of `SalesLT` — `ProductModel`, `ProductDescription`, `ProductModelProductDescription`,
-  `SalesOrderDetail`, and the three catalog views (`vGetAllCategories`, `vProductAndDescription`,
-  `vProductModelCatalogDescription`).
+  and the three catalog views (`vGetAllCategories`, `vProductAndDescription`,
+  `vProductModelCatalogDescription`). (`SalesLT.SalesOrderDetail` is now in use — see above.)
 - **`SalesIntelligence`** — an entirely unbuilt schema (product bundles, recommendations). See the
   schema skill for the table shapes if that work starts. (`Rewards` is now in use — see above.)
 - `dbo` housekeeping tables (`BuildVersion`, `ErrorLog`, `sysdiagrams`) — never relevant to this

@@ -35,19 +35,22 @@ The Data layer should:
   whether `AdventureWorksLtDbContext` maps the tables — not whether the query has joins or
   aggregates:**
   - **EF Core** (`AsNoTracking()` on reads) — the default, for anything over a **mapped** table.
-    `SalesLT.Customer`, `SalesLT.Address`, `SalesLT.CustomerAddress`, and `SalesLT.Product` are
-    the mapped tables today. Aggregates and joins over mapped tables are still EF's job; it
-    handles them fine — see `AddressReadRepository` for a LINQ join across two mapped tables.
+    `SalesLT.Customer`, `SalesLT.Address`, `SalesLT.CustomerAddress`, `SalesLT.Product`,
+    `SalesLT.SalesOrderHeader`, and `SalesLT.SalesOrderDetail` are the mapped tables today.
+    Aggregates and joins over mapped tables are still EF's job; it handles them fine — see
+    `AddressReadRepository` for a LINQ join across two mapped tables and `OrderReadRepository`
+    for an `Include` over a parent/child pair with database-computed columns.
   - **Raw parameterized ADO.NET** (`_dbContext.Database.GetDbConnection()` + `DbCommand`) only for
-    tables the `DbContext` **doesn't map**, which EF can't see at all — `SalesLT.SalesOrderHeader`
-    and the two `Rewards` tables. See `CustomerReadRepository.GetRewardsAsync` for the reference
-    pattern (a cross-schema `LEFT JOIN` over three unmapped tables), including the
+    tables the `DbContext` **doesn't map**, which EF can't see at all — today, just the two
+    `Rewards` tables. See `CustomerReadRepository.GetRewardsAsync` for the reference
+    pattern (a cross-schema `LEFT JOIN` onto unmapped tables), including the
     open/close-connection-in-`finally` handling, and `.claude/agents/sql-safety-reviewer.md` for
     what "safe" raw SQL looks like here.
   - When a new feature needs an unmapped table, **prefer mapping it and writing LINQ** over adding
-    another raw query. The existing raw order queries are raw only because
-    `SalesLT.SalesOrderHeader` isn't mapped — LINQ could express them — so don't read them as
-    precedent that aggregates require SQL.
+    another raw query. The four raw customer-order queries predate `SalesOrderHeader` being
+    mapped and are grandfathered deliberately — see
+    `docs/adr/0010-map-order-tables-keep-legacy-raw-reads.md`; don't read them as precedent that
+    aggregates require SQL, and don't extend them.
 
 ## Dependencies
 

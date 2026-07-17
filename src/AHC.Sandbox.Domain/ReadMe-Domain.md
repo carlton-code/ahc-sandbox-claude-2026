@@ -10,14 +10,16 @@ it's accessed — no framework, no database, no HTTP.
 
 The Domain layer is responsible for:
 
-- Defining core business entities (currently `Customer`, `Address`, and `Product`, under
-  `Entities/`)
+- Defining core business entities (currently `Customer`, `Address`, `Product`, `Order`, and
+  `OrderLine`, under `Entities/`)
 - Defining domain rules and invariants as they emerge
 - Defining value objects, enums, and domain events, if/when the model needs them
 
-**Current state:** `Customer`, `Address`, and `Product` are the only entities, and all are
-intentionally simple today — plain properties plus one computed property each (`FullName`,
-`SingleLineAddress`, `IsDiscontinued`). There's no other business logic here yet because none of
+**Current state:** `Customer`, `Address`, `Product`, `Order`, and `OrderLine` are the only
+entities, and all are intentionally simple today — plain properties plus one computed property
+on most (`FullName`, `SingleLineAddress`, `IsDiscontinued`, `IsShipped`). `Order` is the first
+aggregate-shaped entity, carrying an `IReadOnlyCollection<OrderLine>`. There's no other business
+logic here yet because none of
 the resources implemented so far have needed it. As soon as a real
 business rule shows up (e.g. rewards-tier eligibility, order/bundle validation), it belongs on the
 relevant domain entity or a domain service — not bolted onto an `Application` service or, worse, a
@@ -48,8 +50,8 @@ reverse.
 
 Code that belongs here:
 
-- Entity definitions (`Customer` and `Address` today; future entities for `Product`, bundles,
-  rewards tiers, etc. as those resources are built out)
+- Entity definitions (`Customer`, `Address`, `Product`, `Order`/`OrderLine` today; future
+  entities for bundles, rewards tiers, etc. as those resources are built out)
 - Value object definitions, business rules, and guard clauses, once they exist
 - Domain services with pure business behavior (no persistence, no I/O)
 

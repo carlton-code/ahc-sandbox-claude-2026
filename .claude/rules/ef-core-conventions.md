@@ -9,17 +9,18 @@ Repositories mix two techniques on purpose. **The line between them is whether t
 maps the tables involved — not whether the query has aggregates or joins.**
 
 1. **EF Core** (`AsNoTracking()` for reads) — the default, for anything over a **mapped** table.
-   `SalesLT.Customer`, `SalesLT.Address`, `SalesLT.CustomerAddress`, and `SalesLT.Product` are
-   the mapped tables today. See `CustomerReadRepository.GetAllAsync` / `GetByIdAsync` for plain
-   reads, `SearchByNameAsync` for a more involved one (`EF.Functions.Like` over computed
-   concatenations, with wildcard escaping), and `AddressReadRepository` for a LINQ join across
-   two mapped tables.
+   `SalesLT.Customer`, `SalesLT.Address`, `SalesLT.CustomerAddress`, `SalesLT.Product`,
+   `SalesLT.SalesOrderHeader`, and `SalesLT.SalesOrderDetail` are the mapped tables today. See
+   `CustomerReadRepository.GetAllAsync` / `GetByIdAsync` for plain reads, `SearchByNameAsync` for
+   a more involved one (`EF.Functions.Like` over computed concatenations, with wildcard
+   escaping), `AddressReadRepository` for a LINQ join across two mapped tables, and
+   `OrderReadRepository` for an `Include` over a parent/child pair with database-computed
+   columns (`ValueGeneratedOnAddOrUpdate()`).
 2. **Raw ADO.NET** via `_dbContext.Database.GetDbConnection()` + parameterized `DbCommand` — for
    queries against tables the `DbContext` **doesn't map**, which EF therefore can't see at all:
-   `SalesLT.SalesOrderHeader` and the two `Rewards` tables. `GetRewardsAsync` in
-   `CustomerReadRepository.cs` is the reference: a cross-schema `LEFT JOIN` over three unmapped
-   tables in two schemas. See `docs/adr/0002-ef-core-over-dapper.md` for why raw ADO.NET rather
-   than Dapper.
+   today, only the two `Rewards` tables. `GetRewardsAsync` in `CustomerReadRepository.cs` is the
+   reference: a cross-schema `LEFT JOIN` from a mapped table onto two unmapped ones. See
+   `docs/adr/0002-ef-core-over-dapper.md` for why raw ADO.NET rather than Dapper.
 
 **Don't reach for raw SQL by default — only when a plain EF LINQ query genuinely can't express it.**
 In practice that means: if the tables are already mapped, LINQ is the answer, aggregates and joins
@@ -28,12 +29,13 @@ table and writing LINQ over adding another raw query.** Raw SQL is where you lan
 isn't worth it (a one-off cross-schema report, say), not the default for anything that looks
 SQL-ish.
 
-The existing raw order queries (`GetOrdersByCustomerIdAsync`, `GetOrderByIdAsync`,
-`GetRecentOrdersAsync`, `GetOrderSummaryAsync`) are raw **only because `SalesLT.SalesOrderHeader`
-isn't mapped**, not because LINQ couldn't express them — it could. They work, they're covered by
-integration tests, and they're left alone deliberately; don't read them as a template saying
-"aggregates mean raw SQL." If you add order-related querying, map the table and write LINQ instead
-of extending them.
+The existing raw customer-order queries (`GetOrdersByCustomerIdAsync`, `GetOrderByIdAsync`,
+`GetRecentOrdersAsync`, `GetOrderSummaryAsync`) predate `SalesLT.SalesOrderHeader` being mapped
+and are **grandfathered deliberately** — see `docs/adr/0010-map-order-tables-keep-legacy-raw-reads.md`.
+They work, they're covered by integration tests, and migrating them to LINQ is a recorded
+follow-up decision, not something to fold into other work. Don't read them as a template saying
+"aggregates mean raw SQL," and don't extend them: **new order querying goes through the mapped
+entities and LINQ** (`OrderReadRepository` is the reference).
 
 When adding raw SQL: always parameterize (`AddParameter` helper — never string-concatenate
 input), and follow the existing open/close-connection-in-`finally` pattern rather than assuming

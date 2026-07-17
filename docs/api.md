@@ -203,3 +203,44 @@ All three mutations can return `409 Conflict` (a generic `ProblemDetails`, produ
 The table's binary thumbnail columns (`ThumbNailPhoto`/`ThumbnailPhotoFileName`) are deliberately
 not exposed, and its non-standard `CurrentDiscount` column is not mapped — see
 `docs/database-schema.md`.
+
+## Orders — `api/v1/orders`
+
+**Status:** read-only — `Controllers/OrdersController.cs`. There is deliberately no
+POST/PUT/DELETE: order creation is a real business workflow (a header plus its lines, money math,
+status transitions, a database-computed order number), so write support waits for a genuine use
+case and the Domain rules to go with it.
+
+| Method | Path | Request body | Response body | Status codes |
+|---|---|---|---|---|
+| GET | `/api/v1/orders` | — | `OrderDto[]` | `200` |
+| GET | `/api/v1/orders/{orderId}` | — | `OrderWithLinesDto` | `200`, `404` |
+
+The list returns every order (32 seeded) **newest first** (`orderDate` descending, `orderId` as
+the tiebreaker — load-bearing, since every seed order shares the single date 2008-06-01), with
+headers only: `lines` is not on the list DTO. The by-id read is the one that carries the lines,
+ordered by `orderLineId`.
+
+There is no `?customerId=` filter — `GET /api/v1/customers/{customerId}/orders` already serves
+the customer-scoped view (via a separate DTO, `CustomerOrderDto`; the two surfaces are
+deliberately not coupled).
+
+### DTO shapes (`Application/Orders/Dtos/`)
+
+- **`OrderDto`**: `orderId` (int), `orderNumber` (the database-computed `SO...` number),
+  `customerId` (int), `orderDate`, `dueDate`, `shipDate?`, `status` (byte — the raw
+  `SalesOrderHeader.Status` code; every seed order is `5`/Shipped), `purchaseOrderNumber?`,
+  `accountNumber?`, `shipToAddressId?` (int), `billToAddressId?` (int), `shipMethod`, `subTotal`
+  (decimal), `taxAmount` (decimal), `freightAmount` (decimal), `totalDue` (decimal —
+  database-computed `subTotal + taxAmount + freightAmount`), `trackingNumber`, `comment?`
+  (null on every seed order), `isShipped` (bool — computed: `shipDate != null`; `true` for every
+  seed order).
+- **`OrderWithLinesDto`**: same fields plus `lines: OrderLineDto[]`.
+- **`OrderLineDto`**: `orderLineId` (int), `productId` (int), `orderQty` (short), `unitPrice`
+  (decimal), `unitPriceDiscount` (decimal — a rate, `0.05` = 5% off), `lineTotal` (decimal —
+  database-computed `unitPrice * (1 - unitPriceDiscount) * orderQty`).
+
+Naming note: a "line" in this API is a `SalesLT.SalesOrderDetail` row — `orderLineId` is
+`SalesOrderDetailID`. `taxAmount`/`freightAmount` follow `CustomerOrderDto`'s naming for the
+`TaxAmt`/`Freight` columns. The table's `CreditCardApprovalCode` column is payment data and is
+never mapped or exposed.
