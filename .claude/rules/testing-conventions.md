@@ -26,9 +26,10 @@ See `docs/adr/0005-split-unit-and-integration-test-projects.md` for the full rat
 - **`AHC.Sandbox.UnitTests`** — anything that can run against a fake with no real database, no
   real Redis, no network. This is almost everything: `Domain` invariants, `Application` service
   logic against fake repository interfaces (`ICustomerReadRepository`, etc.).
-- **`AHC.Sandbox.IntegrationTests`** — anything that fundamentally needs the real thing: raw
-  ADO.NET repository methods (`CustomerReadRepository.GetOrderSummaryAsync` etc.) against a real
-  SQL Server, `Infrastructure`'s Redis caching (`RedisCustomerCacheRepository`), or a full
+- **`AHC.Sandbox.IntegrationTests`** — anything that fundamentally needs the real thing:
+  repository methods against a real SQL Server (real SQL translation and collation-dependent
+  ordering, plus the one raw-ADO.NET method, `CustomerReadRepository.GetRewardsAsync`),
+  `Infrastructure`'s Redis caching (`RedisCustomerCacheRepository`), or a full
   end-to-end `Api` test. Connection configuration is wired up via this project's own
   `appsettings.json` plus `Infrastructure/TestConfiguration.cs`, `DbContextTestFactory.cs`, and
   `RedisTestFixture.cs` — reuse those rather than adding a second way to read connection strings.

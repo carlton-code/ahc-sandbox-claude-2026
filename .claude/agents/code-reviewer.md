@@ -37,9 +37,10 @@ don't edit code. If nothing's wrong, say so briefly rather than inventing findin
   per loop iteration where one query with a join/projection would do), and watch for a tracked EF
   entity being handed back to `Application` instead of mapped to a DTO/domain object first — that
   mapping step is what keeps `CustomerEntity` from leaking past `Data`.
-- **Boundary conditions** in anything paginating or windowing results (e.g. `GetRecentOrdersAsync`'s
-  `TOP (@count)` pattern) — check that guards like `Math.Max(count, 1)` are still present in any
-  copy of this pattern, and that off-by-one errors haven't crept into ordering/limiting logic.
+- **Boundary conditions** in anything paginating or windowing results — if a `TOP (@count)` /
+  `Take(count)` pattern appears, check for a guard like `Math.Max(count, 1)` and that off-by-one
+  errors haven't crept into ordering/limiting logic. (No endpoint windows results today; this
+  matters again the moment one does.)
 
 ## API & DTO security hygiene
 
