@@ -78,6 +78,31 @@ namespace AHC.Sandbox.UnitTests.Orders
             Assert.That(result, Is.Empty);
         }
 
+        [Test]
+        public async Task GetOrdersAsync_WithCustomerId_ReturnsOnlyThatCustomersOrders()
+        {
+            _readRepository.Orders.Add(CreateOrder(71774));
+            _readRepository.Orders.Add(CreateOrder(71776, orderNumber: "SO71776", customerId: 30072));
+
+            var result = await _service.GetOrdersAsync(customerId: 29847);
+
+            Assert.That(result, Has.Count.EqualTo(1));
+            Assert.That(result.Single().OrderId, Is.EqualTo(71774));
+            Assert.That(result.Single().CustomerId, Is.EqualTo(29847));
+        }
+
+        // Filter semantics, not sub-resource semantics: an unknown customer is an empty list,
+        // never null/404 — the service has no customer probe to make the distinction, on purpose.
+        [Test]
+        public async Task GetOrdersAsync_WithUnknownCustomerId_ReturnsEmptyNotNull()
+        {
+            _readRepository.Orders.Add(CreateOrder(71774));
+
+            var result = await _service.GetOrdersAsync(customerId: 999999);
+
+            Assert.That(result, Is.Empty);
+        }
+
         // --- GetOrderByIdAsync ----------------------------------------------------------------
 
         // The mapping is the only real logic in this service, so this pins every header field

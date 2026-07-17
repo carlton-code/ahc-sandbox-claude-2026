@@ -20,12 +20,17 @@ namespace AHC.Sandbox.IntegrationTests.Orders;
 ///   (qty 3, product 714, UnitPrice 29.9940, no discount, computed LineTotal 89.982000).
 /// - SalesOrderID 999999 is unknown.
 /// - No seed order has a null ShipDate, so IsShipped's false branch is covered by unit tests.
+/// - CustomerID 29485 has exactly one order (71782); CustomerID 1 (Orlando Gee) exists but has
+///   none; CustomerID 999999 is unknown — the three customerId-filter states.
 /// </summary>
 public class OrderReadRepositoryTests
 {
     private const int KnownOrderId = 71774;
     private const int KnownOrderIdWithManyLines = 71782;
     private const int UnknownOrderId = 999999;
+    private const int KnownCustomerIdWithOneOrder = 29485;
+    private const int KnownCustomerIdWithoutOrders = 1;
+    private const int UnknownCustomerId = 999999;
 
     private AdventureWorksLtDbContext _dbContext = null!;
     private OrderReadRepository _repository = null!;
@@ -67,6 +72,34 @@ public class OrderReadRepositoryTests
         Assert.That(orders, Is.Not.Empty);
         Assert.That(orders.All(o => o.Lines.Count == 0), Is.True,
             "GetAllAsync is a headers-only read; no order should carry lines.");
+    }
+
+    [Test]
+    public async Task GetAllAsync_WithCustomerId_ReturnsOnlyThatCustomersOrders()
+    {
+        var orders = await _repository.GetAllAsync(KnownCustomerIdWithOneOrder);
+
+        Assert.That(orders, Has.Count.EqualTo(1));
+        Assert.That(orders.Single().OrderId, Is.EqualTo(KnownOrderIdWithManyLines));
+        Assert.That(orders.Single().CustomerId, Is.EqualTo(KnownCustomerIdWithOneOrder));
+    }
+
+    // Filter semantics: a customer with no orders and an unknown customer both come back empty —
+    // the repository deliberately doesn't probe customer existence for the filtered list.
+    [Test]
+    public async Task GetAllAsync_WithCustomerIdWithoutOrders_ReturnsEmpty()
+    {
+        var orders = await _repository.GetAllAsync(KnownCustomerIdWithoutOrders);
+
+        Assert.That(orders, Is.Empty);
+    }
+
+    [Test]
+    public async Task GetAllAsync_WithUnknownCustomerId_ReturnsEmpty()
+    {
+        var orders = await _repository.GetAllAsync(UnknownCustomerId);
+
+        Assert.That(orders, Is.Empty);
     }
 
     private async Task<int[]> GetOrderIdsNewestFirstAsync()
