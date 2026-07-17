@@ -31,6 +31,7 @@ Each ADR follows the same shape (see `template.md`):
 | [0007](0007-drop-password-columns-from-customer.md) | Drop `PasswordHash`/`PasswordSalt` from `SalesLT.Customer` |
 | [0008](0008-one-rewards-tier-per-customer.md) | Enforce one rewards tier per customer at the schema level |
 | [0009](0009-customer-delete-refuses-rather-than-cascades.md) | Customer delete returns `409` rather than cascading |
+| [0010](0010-map-order-tables-keep-legacy-raw-reads.md) | Map the order tables in EF, keep the legacy raw customer-order reads |
 
 ## Adding a new ADR
 
