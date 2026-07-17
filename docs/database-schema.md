@@ -156,6 +156,31 @@ The product catalog record backing the `Product` resource (`api/v1/products`).
   by something.
 - **Touched by:** `Data/Repositories/ProductReadRepository.cs`, `ProductWriteRepository.cs`.
 
+### `SalesLT.vProductAndDescription` (view)
+
+The English marketing description enriching `ProductDto.description`, joined onto the `Product`
+reads (`GET /api/v1/products` and `/{id}`).
+
+- **Mapped by:** `ProductDescriptionView` (keyless) + the Fluent API config in
+  `Data/Context/AdventureWorksLtDbContext.cs`. This is the first **view** mapped in the model, and
+  the first keyless entity — `HasNoKey().ToView("vProductAndDescription", "SalesLT")`, so EF treats
+  it as query-only (no tracking, no writes). Read with LINQ, not raw SQL: a keyless entity + a
+  `LEFT JOIN` expresses it fine, so raw ADO.NET (reserved for the unmapped `Rewards` tables) isn't
+  warranted.
+- **Columns currently mapped:** `ProductID`, `Culture`, `Description`. `Name`/`ProductModel` are
+  left unmapped — the join already has the product from `ProductEntity`.
+- **Known gotcha:** the view has **one row per product per culture** (6 cultures, ~1,764 rows).
+  `ProductReadRepository` filters to English before the join. `Culture` is `nchar(6)`, so its
+  values are **space-padded** (`'en    '`) — filter with `LIKE 'en%'` (`EF.Functions.Like` /
+  `StartsWith`), never `= 'en'`.
+- **Known gotcha:** **294 of 295 products have an English description; one (`ProductID` 907,
+  "Rear Brakes") has none.** The join is a `LEFT JOIN` (`DefaultIfEmpty`) precisely so that product
+  still returns, with `description: null` — an inner join would silently drop it.
+- **Write path leaves it null:** `ProductMapper.ToDomain`'s `description` parameter defaults to
+  null and the write repository never reads the view, so a product read back straight after
+  `POST`/`PUT` has `description: null` until the view reflects it.
+- **Touched by:** `Data/Repositories/ProductReadRepository.cs` (`GetAllAsync`/`GetByIdAsync`).
+
 ## Not in use
 
 No entity, mapping, query, or controller exists for these — nothing here counts as "in use."
@@ -164,12 +189,33 @@ No entity, mapping, query, or controller exists for these — nothing here count
   it, but the id is exposed as-is; nothing reads the category itself. (`SalesLT.Product` is now
   in use — see above.)
 - The rest of `SalesLT` — `ProductModel`, `ProductDescription`, `ProductModelProductDescription`,
-  and the three catalog views (`vGetAllCategories`, `vProductAndDescription`,
-  `vProductModelCatalogDescription`). (`SalesLT.SalesOrderDetail` is now in use — see above.)
+  and two of the three catalog views (`vGetAllCategories`, `vProductModelCatalogDescription` — see
+  the note below). (`SalesLT.SalesOrderDetail` and the `vProductAndDescription` view are now in
+  use — see above.)
 - **`SalesIntelligence`** — an entirely unbuilt schema (product bundles, recommendations). See the
   schema skill for the table shapes if that work starts. (`Rewards` is now in use — see above.)
 - `dbo` housekeeping tables (`BuildVersion`, `ErrorLog`, `sysdiagrams`) — never relevant to this
   API.
+
+### The `SalesLT` views, and whether they fit existing routes
+
+Column-level detail and gotchas (padded `Culture`, coverage counts, keyless EF mapping) live in the
+schema skill's *Views* section. The short version:
+
+- **`vProductAndDescription` is now in use** — it backs `ProductDto.description` (see its "in use"
+  entry above). It was the highest-value of the three: the only source of a human-readable product
+  description, with 294 of 295 products covered in English.
+- **None of the remaining two simplifies an existing query.** No current repository joins
+  `ProductCategory` or `ProductModel`, so there's no hand-rolled join a view could replace. They're
+  *additive* — they'd enable new data on a route, not tidy up an existing one.
+- **`vGetAllCategories`** only helps if we decide to surface category *names*. `ProductDto` exposes
+  `ProductCategoryID` as a bare int; this view (parent name + category name + id, 37 rows) could
+  back a `/categories` list or add a category name to `ProductDto`. Purely a new feature, not a fix.
+- **`vProductModelCatalogDescription`** — 6 rows, sparse marketing XML. Not worth a route on its
+  own.
+
+Adding any of these is a new vertical slice (Application DTO + Data read + Api), so it goes through
+Plan Mode per `CLAUDE.md`, not a drive-by edit.
 
 ## Keeping this current
 

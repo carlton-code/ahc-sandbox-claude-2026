@@ -18,11 +18,16 @@ namespace AHC.Sandbox.IntegrationTests.Products;
 /// - ProductID 999999 is unknown (max seeded ProductID is 999).
 /// - No seeded product has a DiscontinuedDate, so IsDiscontinued's true branch is covered by
 ///   unit tests rather than seed data.
+/// - ProductID 680 has an English row in SalesLT.vProductAndDescription whose Description starts
+///   "Our lightest and best quality aluminum frame". ProductID 907 ("Rear Brakes") is the one
+///   seeded product with no English description at all — its Description maps to null, proving the
+///   join is a LEFT JOIN and not an inner one.
 /// </summary>
 public class ProductReadRepositoryTests
 {
     private const int KnownProductId = 680;
     private const int KnownProductIdWithNullOptionals = 879;
+    private const int KnownProductIdWithoutEnglishDescription = 907;
     private const int UnknownProductId = 999999;
 
     private AdventureWorksLtDbContext _dbContext = null!;
@@ -138,5 +143,50 @@ public class ProductReadRepositoryTests
         var product = await _repository.GetByIdAsync(UnknownProductId);
 
         Assert.That(product, Is.Null);
+    }
+
+    // --- Description enrichment (SalesLT.vProductAndDescription) ----------------------------
+
+    [Test]
+    public async Task GetByIdAsync_ProductWithEnglishDescription_PopulatesIt()
+    {
+        var product = await _repository.GetByIdAsync(KnownProductId);
+
+        Assert.That(product, Is.Not.Null);
+        Assert.That(
+            product!.Description,
+            Does.StartWith("Our lightest and best quality aluminum frame"));
+    }
+
+    // The LEFT JOIN case: a product with no English description row must still come back, with a
+    // null Description rather than being filtered out by an accidental inner join.
+    [Test]
+    public async Task GetByIdAsync_ProductWithoutEnglishDescription_ReturnsProductWithNullDescription()
+    {
+        var product = await _repository.GetByIdAsync(KnownProductIdWithoutEnglishDescription);
+
+        Assert.That(product, Is.Not.Null);
+        Assert.That(product!.Name, Is.EqualTo("Rear Brakes"));
+        Assert.That(product.Description, Is.Null);
+    }
+
+    [Test]
+    public async Task GetAllAsync_IncludesTheProductThatHasNoEnglishDescription()
+    {
+        var products = await _repository.GetAllAsync();
+
+        var withDescription = products.SingleOrDefault(p => p.ProductId == KnownProductId);
+        Assert.That(withDescription, Is.Not.Null);
+        Assert.That(
+            withDescription!.Description,
+            Does.StartWith("Our lightest and best quality aluminum frame"));
+
+        // The join must not drop the product that lacks an English description, and must not
+        // duplicate the ones that have exactly one.
+        var withoutDescription = products
+            .Where(p => p.ProductId == KnownProductIdWithoutEnglishDescription)
+            .ToArray();
+        Assert.That(withoutDescription, Has.Length.EqualTo(1));
+        Assert.That(withoutDescription[0].Description, Is.Null);
     }
 }

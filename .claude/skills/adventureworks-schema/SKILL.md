@@ -210,20 +210,39 @@ Composite PK (`SalesOrderID`, `SalesOrderDetailID`). `LineTotal` is **database-c
 (`UnitPrice * (1 - UnitPriceDiscount) * OrderQty`, `numeric(38,6)`), mapped with
 `ValueGeneratedOnAddOrUpdate()`. Exposed as `lines` on `GET /api/v1/orders/{orderId}`.
 
-### Views (read-only, no PK — don't attempt to EF-map with `HasKey`)
+### Views (read-only)
 
-- **vGetAllCategories**: `ParentProductCategoryName` nvarchar(50) NOT NULL,
-  `ProductCategoryName` nvarchar(50), `ProductCategoryID` int. Flattened category tree — useful
-  instead of hand-rolling the `ProductCategory` self-join if a "categories with parent names"
-  endpoint is ever needed.
-- **vProductAndDescription**: `ProductID`, `Name`, `ProductModel`, `Culture` nchar(6) NOT NULL,
-  `Description` nvarchar(400) NOT NULL. Joins Product → ProductModel →
-  ProductModelProductDescription → ProductDescription per culture.
-- **vProductModelCatalogDescription**: wide catalog-sheet view off `ProductModel` (marketing copy
-  fields — `Summary`, `Manufacturer`, `Warranty*`, `Maintenance*`, `Wheel`, `Saddle`, `Pedal`,
-  `BikeFrame`, `Crankset`, `Material`, `Color`, `ProductLine`, `Style`, `RiderExperience`, plus
-  `ProductURL`, `rowguid`, `ModifiedDate`) — most fields are nullable free text; only pull the
-  ones an endpoint actually needs rather than mapping the whole view.
+All three are stock AdventureWorksLT views in `SalesLT`, all keyless (no PK). Row counts below
+verified against the live database 2026-07-17. To read one through EF, map it as a keyless entity
+(`entity.HasNoKey().ToView("<name>", "SalesLT")`) — **not** `HasKey`; a keyless entity is
+query-only, so it can't be tracked or written, which is exactly right for a view. Raw parameterized
+SQL is the alternative (as with the `Rewards` tables). Only `vProductAndDescription` is consumed by
+code today (see below); the other two are unused.
+
+- **vGetAllCategories** — `ParentProductCategoryName` nvarchar(50) NOT NULL,
+  `ProductCategoryName` nvarchar(50), `ProductCategoryID` int. **37 rows.** A recursive CTE that
+  flattens the `ProductCategory` self-hierarchy to `(parent name, category name, category id)`.
+  Only returns categories that *have* a parent — the four roots (`Bikes`, `Components`, `Clothing`,
+  `Accessories`) appear only in the `ParentProductCategoryName` column, never as a row of their
+  own. Saves hand-rolling the self-join if a "categories with parent names" read is ever needed.
+- **vProductAndDescription** — `ProductID` int NOT NULL, `Name` nvarchar(50) NOT NULL,
+  `ProductModel` nvarchar(50) NOT NULL, `Culture` nchar(6) NOT NULL, `Description` nvarchar(400)
+  NOT NULL. **1,764 rows.** Joins Product → ProductModel → ProductModelProductDescription →
+  ProductDescription, one row **per product per culture**. Six cultures are present (`en`, `fr`,
+  `th`, `ar`, `he`, `zh-cht`); `Culture` is `nchar(6)`, so it's space-padded (`'en    '`) — match
+  with `LIKE 'en%'` or `RTRIM`, not `= 'en'`. Coverage: **294 of 295 products** have an `en`
+  description (one product has none, `ProductID` 907 — a `LEFT JOIN`/outer read, not inner, if you
+  need all products). **In use:** mapped keyless as `ProductDescriptionView` and joined onto the
+  `Product` reads to fill `ProductDto.description` (English only) — see `ProductReadRepository` and
+  the `SalesLT.vProductAndDescription` entry in `docs/database-schema.md`.
+- **vProductModelCatalogDescription** — wide catalog-sheet view off `ProductModel` (`ProductModelID`
+  int NOT NULL, `Name` NOT NULL, then marketing copy: `Summary`/`Manufacturer` nvarchar(max),
+  `Copyright`, `ProductURL`, `Warranty*`, `NoOfYears`, `MaintenanceDescription`, `Wheel`, `Saddle`,
+  `Pedal`, `BikeFrame`, `Crankset`, `Picture*`, `ProductPhotoID`, `Material`, `Color`,
+  `ProductLine`, `Style`, `RiderExperience`, plus `rowguid`, `ModifiedDate`). **Only 6 rows** — it
+  parses the `ProductModel.CatalogDescription` XML, and just six models carry that XML. Most fields
+  are nullable free text; pull only the columns an endpoint needs rather than mapping the whole
+  view. Low value given the tiny, sparse coverage.
 
 ## SalesIntelligence schema — no code references these yet
 

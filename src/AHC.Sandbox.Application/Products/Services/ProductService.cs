@@ -152,7 +152,8 @@ namespace AHC.Sandbox.Application.Products.Services
                 SellStartDate = product.SellStartDate,
                 SellEndDate = product.SellEndDate,
                 DiscontinuedDate = product.DiscontinuedDate,
-                IsDiscontinued = product.IsDiscontinued
+                IsDiscontinued = product.IsDiscontinued,
+                Description = product.Description
             };
         }
     }

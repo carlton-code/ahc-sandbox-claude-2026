@@ -20,6 +20,11 @@ namespace AHC.Sandbox.Domain.Entities
         public DateTime? SellEndDate { get; init; }
         public DateTime? DiscontinuedDate { get; init; }
 
+        // Populated on the read path only, from SalesLT.vProductAndDescription (English culture).
+        // Null when the product has no English description (one seeded product) or on the write
+        // path, which never touches the view.
+        public string? Description { get; init; }
+
         public bool IsDiscontinued => DiscontinuedDate is not null;
     }
 

@@ -196,7 +196,10 @@ All three mutations can return `409 Conflict` (a generic `ProblemDetails`, produ
 - **`ProductDto`**: `productId` (int), `name`, `productNumber`, `color?`, `standardCost`
   (decimal), `listPrice` (decimal), `size?`, `weight?` (decimal), `productCategoryId?` (int),
   `productModelId?` (int), `sellStartDate`, `sellEndDate?`, `discontinuedDate?`, `isDiscontinued`
-  (bool — computed: `discontinuedDate != null`).
+  (bool — computed: `discontinuedDate != null`), `description?` (string — the English marketing
+  copy from `SalesLT.vProductAndDescription`; `null` for the one seeded product that has none).
+  `description` is read-only — it's not on `CreateProductDto`/`UpdateProductDto`, and a
+  just-created product reads back `null` until the view has a row for it.
 - **`CreateProductDto`**: `name`, `productNumber`, `color?`, `standardCost`, `listPrice`, `size?`,
   `weight?`, `productCategoryId?`, `productModelId?`, `sellStartDate`, `sellEndDate?`,
   `discontinuedDate?`.

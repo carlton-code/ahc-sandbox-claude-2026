@@ -20,5 +20,9 @@ namespace AHC.Sandbox.Application.Products.Dtos
         public DateTime? SellEndDate { get; init; }
         public DateTime? DiscontinuedDate { get; init; }
         public bool IsDiscontinued { get; init; }
+
+        // English marketing description from SalesLT.vProductAndDescription; null when the product
+        // has none.
+        public string? Description { get; init; }
     }
 }

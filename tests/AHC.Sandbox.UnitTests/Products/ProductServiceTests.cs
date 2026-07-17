@@ -38,7 +38,8 @@ namespace AHC.Sandbox.UnitTests.Products
             int? productCategoryId = 18,
             int? productModelId = 6,
             DateTime? sellEndDate = null,
-            DateTime? discontinuedDate = null)
+            DateTime? discontinuedDate = null,
+            string? description = "Our lightest and best quality aluminum frame.")
         {
             return new Product
             {
@@ -54,7 +55,8 @@ namespace AHC.Sandbox.UnitTests.Products
                 ProductModelId = productModelId,
                 SellStartDate = new DateTime(2002, 6, 1),
                 SellEndDate = sellEndDate,
-                DiscontinuedDate = discontinuedDate
+                DiscontinuedDate = discontinuedDate,
+                Description = description
             };
         }
 
@@ -119,6 +121,18 @@ namespace AHC.Sandbox.UnitTests.Products
             Assert.That(result.SellEndDate, Is.EqualTo(new DateTime(2007, 6, 30)));
             Assert.That(result.DiscontinuedDate, Is.Null);
             Assert.That(result.IsDiscontinued, Is.False);
+            Assert.That(result.Description, Is.EqualTo("Our lightest and best quality aluminum frame."));
+        }
+
+        [Test]
+        public async Task GetProductByIdAsync_ProductWithNoDescription_MapsNullDescription()
+        {
+            _readRepository.Products.Add(CreateProduct(907, description: null));
+
+            var result = await _service.GetProductByIdAsync(907);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result!.Description, Is.Null);
         }
 
         [Test]
