@@ -13,8 +13,8 @@ The Application layer is responsible for:
 - Implementing use cases (one service per resource — `CustomerService`, `AddressService`)
 - Coordinating domain objects and the repository ports (interfaces) that read/write them
 - Defining DTOs — the boundary shape between the outside world and the domain (e.g.
-  `CustomerDto`, `CreateCustomerDto`, `CustomerOrderDto`, `CustomerSummaryDto`,
-  `CustomerRewardsDto`, `CustomerAddressDto`)
+  `CustomerDto`, `CreateCustomerDto`, `CustomerSummaryDto`,
+  `CustomerRewardsDto`, `CustomerAddressDto`, `OrderDto`)
 - Defining two kinds of **interfaces**, with different implementers:
   - repository/cache ports that `Data` and `Infrastructure` implement
     (`ICustomerReadRepository`, `ICustomerWriteRepository`, `IAddressReadRepository`,

@@ -24,8 +24,9 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
   resource's "Request validation — `400`" section for the exact rules.
 - A `400` returns a `ValidationProblemDetails` body — a `ProblemDetails` plus an `errors` map
   keyed by parameter name.
-- **Query parameters** are called out inline in the Path column (`?q=<term>`) rather than getting
-  their own column — `search` is the only endpoint taking one today.
+- **Query parameters** are called out inline in the Path column (`?q=<term>`,
+  `?customerId=<id>`) rather than getting their own column — `search`'s required `q` and the
+  Orders list's optional `customerId` are the only two today.
 
 ## Customers — `api/v1/customers`
 
@@ -40,14 +41,17 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 | PUT | `/api/v1/customers/{customerId}` | `UpdateCustomerDto` | — | `204`, `400`, `404` |
 | PATCH | `/api/v1/customers/{customerId}` | `PatchCustomerDto` | `CustomerDto` | `200`, `400`, `404` |
 | DELETE | `/api/v1/customers/{customerId}` | — | — | `204`, `404`, `409` |
-| GET | `/api/v1/customers/{customerId}/orders` | — | `CustomerOrderDto[]` | `200`, `404` |
-| GET | `/api/v1/customers/{customerId}/orders/{orderId}` | — | `CustomerOrderDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/summary` | — | `CustomerSummaryDto` | `200`, `404` |
-| GET | `/api/v1/customers/{customerId}/recent-orders` | — | `CustomerOrderDto[]` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/order-summary` | — | `CustomerOrderSummaryDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/rewards` | — | `CustomerRewardsDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/addresses` | — | `CustomerAddressDto[]` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/addresses/{addressId}` | — | `CustomerAddressDto` | `200`, `404` |
+
+There are no order-list routes under customers anymore: `/customers/{id}/orders`,
+`/customers/{id}/orders/{orderId}`, and `/customers/{id}/recent-orders` were removed in favor of
+`GET /api/v1/orders?customerId=<id>` and `GET /api/v1/orders/{orderId}` (see the Orders section
+and ADR-0011). The two aggregate reports (`/summary`, `/order-summary`) stay here — they
+describe the customer, not orders as a resource.
 
 ### Request validation — `400`
 
@@ -114,8 +118,6 @@ paging, consistent with that endpoint (847 customers is the ceiling).
 - **`PatchCustomerDto`**: every field nullable/optional — `firstName?`, `middleName?`, `lastName?`,
   `companyName?`, `emailAddress?`. Unset fields keep the existing value (see
   `CustomerService.PatchCustomerAsync`).
-- **`CustomerOrderDto`**: `orderId`, `customerId`, `orderNumber`, `orderDate`, `shipDate?`,
-  `subTotal`, `taxAmount`, `freightAmount`, `totalDue` (all money fields `decimal`).
 - **`CustomerSummaryDto`**: `customer` (`CustomerDto`), `orderCount`, `totalOrderValue`,
   `mostRecentOrderDate?`.
 - **`CustomerOrderSummaryDto`**: `customerId`, `orderCount`, `subTotal`, `taxAmount`,
@@ -213,7 +215,7 @@ case and the Domain rules to go with it.
 
 | Method | Path | Request body | Response body | Status codes |
 |---|---|---|---|---|
-| GET | `/api/v1/orders` | — | `OrderDto[]` | `200` |
+| GET | `/api/v1/orders?customerId=<id>` | — | `OrderDto[]` | `200`, `400` |
 | GET | `/api/v1/orders/{orderId}` | — | `OrderWithLinesDto` | `200`, `404` |
 
 The list returns every order (32 seeded) **newest first** (`orderDate` descending, `orderId` as
@@ -221,9 +223,11 @@ the tiebreaker — load-bearing, since every seed order shares the single date 2
 headers only: `lines` is not on the list DTO. The by-id read is the one that carries the lines,
 ordered by `orderLineId`.
 
-There is no `?customerId=` filter — `GET /api/v1/customers/{customerId}/orders` already serves
-the customer-scoped view (via a separate DTO, `CustomerOrderDto`; the two surfaces are
-deliberately not coupled).
+`customerId` is **optional** and this is the only place to read a customer's orders — it
+replaced the old `/customers/{id}/orders` sub-resource (ADR-0011). **Filter semantics apply**:
+an unknown customer or one with no orders (815 of 847) is a `200` with `[]`, never a `404` —
+unlike the removed sub-resource, nothing probes whether the customer exists. A non-integer
+`customerId` is the `400` (`ValidationProblemDetails`, from `[ApiController]` model binding).
 
 ### DTO shapes (`Application/Orders/Dtos/`)
 
@@ -241,6 +245,6 @@ deliberately not coupled).
   database-computed `unitPrice * (1 - unitPriceDiscount) * orderQty`).
 
 Naming note: a "line" in this API is a `SalesLT.SalesOrderDetail` row — `orderLineId` is
-`SalesOrderDetailID`. `taxAmount`/`freightAmount` follow `CustomerOrderDto`'s naming for the
-`TaxAmt`/`Freight` columns. The table's `CreditCardApprovalCode` column is payment data and is
-never mapped or exposed.
+`SalesOrderDetailID`. `taxAmount`/`freightAmount` are the API names for the `TaxAmt`/`Freight`
+columns (matching `CustomerOrderSummaryDto`). The table's `CreditCardApprovalCode` column is
+payment data and is never mapped or exposed.
