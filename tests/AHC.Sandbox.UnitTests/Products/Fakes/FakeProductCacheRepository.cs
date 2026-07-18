@@ -19,6 +19,7 @@ namespace AHC.Sandbox.UnitTests.Products.Fakes
         public bool SetAsyncCalled { get; private set; }
         public bool RemoveAsyncCalled { get; private set; }
         public int? LastRemovedProductId { get; private set; }
+        public List<int> RemovedProductIds { get; } = new();
 
         public void Seed(int productId, ProductDto product) => _cache[productId] = product;
 
@@ -54,6 +55,7 @@ namespace AHC.Sandbox.UnitTests.Products.Fakes
         {
             RemoveAsyncCalled = true;
             LastRemovedProductId = productId;
+            RemovedProductIds.Add(productId);
 
             if (ThrowOnRemove)
             {
