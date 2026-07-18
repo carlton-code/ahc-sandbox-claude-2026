@@ -1,3 +1,5 @@
+using AHC.Sandbox.Application.ProductModels.Dtos;
+using AHC.Sandbox.Application.ProductModels.Interfaces;
 using AHC.Sandbox.Application.Products.Dtos;
 using AHC.Sandbox.Application.Products.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -27,10 +29,12 @@ namespace AHC.Sandbox.Api.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
+        private readonly IProductModelService _productModelService;
 
-        public ProductsController(IProductService productService)
+        public ProductsController(IProductService productService, IProductModelService productModelService)
         {
             _productService = productService;
+            _productModelService = productModelService;
         }
 
         [HttpGet]
@@ -50,6 +54,23 @@ namespace AHC.Sandbox.Api.Controllers
             var product = await _productService.GetProductByIdAsync(productId, cancellationToken);
 
             return product is null ? NotFound() : Ok(product);
+        }
+
+        /// <summary>
+        /// Gets the model this product belongs to, including the model's shared English description.
+        /// </summary>
+        /// <remarks>
+        /// A discoverability link to the <c>product-models</c> resource, where the description is
+        /// edited. Returns <c>404</c> for an unknown product (or the rare product with no model).
+        /// </remarks>
+        [HttpGet("{productId:int}/model")]
+        [ProducesResponseType<ProductModelDto>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ProductModelDto>> GetProductModel(int productId, CancellationToken cancellationToken)
+        {
+            var model = await _productModelService.GetByProductIdAsync(productId, cancellationToken);
+
+            return model is null ? NotFound() : Ok(model);
         }
 
         /// <summary>

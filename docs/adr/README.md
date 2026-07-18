@@ -33,6 +33,7 @@ Each ADR follows the same shape (see `template.md`):
 | [0009](0009-customer-delete-refuses-rather-than-cascades.md) | Customer delete returns `409` rather than cascading |
 | [0010](0010-map-order-tables-keep-legacy-raw-reads.md) | Map the order tables in EF, keep the legacy raw customer-order reads *(superseded by 0011)* |
 | [0011](0011-consolidate-order-reads-remove-raw-order-sql.md) | Consolidate order reads onto the Orders resource, delete the raw order SQL |
+| [0012](0012-edit-product-descriptions-at-the-model-level.md) | Edit product descriptions on a `ProductModel` resource, not per product |
 
 ## Adding a new ADR
 

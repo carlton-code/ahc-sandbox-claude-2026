@@ -20,6 +20,12 @@ public class AdventureWorksLtDbContext : DbContext
 
     public DbSet<ProductDescriptionView> ProductDescriptions => Set<ProductDescriptionView>();
 
+    public DbSet<ProductModelEntity> ProductModels => Set<ProductModelEntity>();
+
+    public DbSet<ProductDescriptionEntity> ProductDescriptionRows => Set<ProductDescriptionEntity>();
+
+    public DbSet<ProductModelProductDescriptionEntity> ProductModelProductDescriptions => Set<ProductModelProductDescriptionEntity>();
+
     public DbSet<SalesOrderHeaderEntity> SalesOrderHeaders => Set<SalesOrderHeaderEntity>();
 
     public DbSet<SalesOrderDetailEntity> SalesOrderDetails => Set<SalesOrderDetailEntity>();
@@ -232,6 +238,64 @@ public class AdventureWorksLtDbContext : DbContext
             entity.Property(e => e.Description)
                 .HasColumnName("Description")
                 .HasMaxLength(400);
+        });
+
+        // The description write surface (PUT /product-models/{id}/description) maps the three real
+        // tables behind that keyless view, so the edit can be a tracked EF update rather than raw
+        // SQL. The read enrichment above still uses the view; these mappings exist for the model
+        // resource and its description upsert. rowguid/ModifiedDate are unmapped on all three
+        // (NOT NULL with database defaults newid()/getdate()), as elsewhere; ProductModel's
+        // CatalogDescription (xml) is unmapped too — nothing reads it.
+        modelBuilder.Entity<ProductModelEntity>(entity =>
+        {
+            entity.ToTable("ProductModel", "SalesLT");
+
+            entity.HasKey(e => e.ProductModelId);
+
+            entity.Property(e => e.ProductModelId)
+                .HasColumnName("ProductModelID");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("Name")
+                .HasMaxLength(50)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity<ProductDescriptionEntity>(entity =>
+        {
+            entity.ToTable("ProductDescription", "SalesLT");
+
+            entity.HasKey(e => e.ProductDescriptionId);
+
+            // IDENTITY column — EF generates it on insert (this is EF's default for an int key, but
+            // pinned explicitly since the create-description branch depends on it).
+            entity.Property(e => e.ProductDescriptionId)
+                .HasColumnName("ProductDescriptionID")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Description)
+                .HasColumnName("Description")
+                .HasMaxLength(400)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity<ProductModelProductDescriptionEntity>(entity =>
+        {
+            entity.ToTable("ProductModelProductDescription", "SalesLT");
+
+            entity.HasKey(e => new { e.ProductModelId, e.ProductDescriptionId, e.Culture });
+
+            entity.Property(e => e.ProductModelId)
+                .HasColumnName("ProductModelID");
+
+            entity.Property(e => e.ProductDescriptionId)
+                .HasColumnName("ProductDescriptionID");
+
+            // nchar(6), so stored values are space-padded ('en    '). Filter with LIKE 'en%'; a new
+            // row inserted with "en" is padded by the database automatically.
+            entity.Property(e => e.Culture)
+                .HasColumnName("Culture")
+                .HasColumnType("nchar(6)");
         });
 
         // SalesOrderHeader maps what the read-only Order slice serves. CreditCardApprovalCode is

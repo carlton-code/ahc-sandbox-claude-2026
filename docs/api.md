@@ -153,6 +153,7 @@ have one `Main Office` and one `Shipping`.
 |---|---|---|---|---|
 | GET | `/api/v1/products` | — | `ProductDto[]` | `200` |
 | GET | `/api/v1/products/{productId}` | — | `ProductDto` | `200`, `404` |
+| GET | `/api/v1/products/{productId}/model` | — | `ProductModelDto` | `200`, `404` |
 | POST | `/api/v1/products` | `CreateProductDto` | `ProductDto` | `201` (+ `Location` header via `CreatedAtAction`), `400`, `409` |
 | PUT | `/api/v1/products/{productId}` | `UpdateProductDto` | — | `204`, `400`, `404`, `409` |
 | DELETE | `/api/v1/products/{productId}` | — | — | `204`, `404`, `409` |
@@ -208,6 +209,42 @@ All three mutations can return `409 Conflict` (a generic `ProblemDetails`, produ
 The table's binary thumbnail columns (`ThumbNailPhoto`/`ThumbnailPhotoFileName`) are deliberately
 not exposed, and its non-standard `CurrentDiscount` column is not mapped — see
 `docs/database-schema.md`.
+
+`GET /products/{productId}/model` returns the `ProductModel` this product resolves to (a
+discoverability link to the `product-models` resource below). A `404` means the product doesn't
+exist — or, in the rare case, has no model.
+
+## Product Models — `api/v1/product-models`
+
+**Status:** read + description write — `Controllers/ProductModelsController.cs`.
+
+| Method | Path | Request body | Response body | Status codes |
+|---|---|---|---|---|
+| GET | `/api/v1/product-models/{modelId}` | — | `ProductModelDto` | `200`, `404` |
+| PUT | `/api/v1/product-models/{modelId}/description` | `UpdateProductModelDescriptionDto` | — | `204`, `400`, `404` |
+
+A product's English marketing description lives on its **model**, shared by every product variant on
+that model (e.g. `ProductModelID` 6, "HL Road Frame", backs 11 variants that all show one
+description). Editing it here is deliberate — a model-scoped route so the shared effect is explicit,
+rather than a `/products/{id}` write that would silently change siblings. See
+`docs/adr/0012-edit-product-descriptions-at-the-model-level.md`.
+
+- **`PUT …/description`** sets the English (`en`) description, **create-or-replace**: it updates the
+  model's existing description, or creates one if the model has none yet. `204` on success, `404`
+  for an unknown model, `400` for a missing/whitespace or over-400-character `description`
+  (`ValidationProblemDetails`). The edit changes the description for **every** product on the model.
+- **Cache effect:** because `ProductDto.description` is cached per product, a successful edit evicts
+  every affected product from the Redis product cache so their next read reflects the new text
+  (best-effort — a cache outage is logged, not surfaced).
+
+The route is spelled out explicitly (`api/v1/product-models`) rather than via the `[controller]`
+token, which would render `ProductModels` — this is the first multi-word resource.
+
+### DTO shapes (`Application/ProductModels/Dtos/`)
+
+- **`ProductModelDto`**: `modelId` (int), `name`, `description?` (English; `null` when the model has
+  none).
+- **`UpdateProductModelDescriptionDto`**: `description` (required, max 400).
 
 ## Orders — `api/v1/orders`
 
