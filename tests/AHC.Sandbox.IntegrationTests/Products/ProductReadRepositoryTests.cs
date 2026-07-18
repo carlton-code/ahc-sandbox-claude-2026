@@ -189,4 +189,47 @@ public class ProductReadRepositoryTests
         Assert.That(withoutDescription, Has.Length.EqualTo(1));
         Assert.That(withoutDescription[0].Description, Is.Null);
     }
+
+    // --- Category enrichment (SalesLT.ProductCategory) -------------------------------------
+
+    // Product 680 is on subcategory 18 ("Road Frames") whose parent is "Components".
+    [Test]
+    public async Task GetByIdAsync_Product_ResolvesCategoryNameAndParentName()
+    {
+        var product = await _repository.GetByIdAsync(KnownProductId);
+
+        Assert.That(product, Is.Not.Null);
+        Assert.That(product!.Category, Is.Not.Null);
+        Assert.That(product.Category!.Id, Is.EqualTo(18));
+        Assert.That(product.Category.Name, Is.EqualTo("Road Frames"));
+        Assert.That(product.Category.ParentName, Is.EqualTo("Components"));
+    }
+
+    // The self-join for the parent name must not drop a product: the category id still maps even
+    // for the null-optionals product, with its own parent.
+    [Test]
+    public async Task GetByIdAsync_ProductWithNullOptionalColumns_StillResolvesCategory()
+    {
+        var product = await _repository.GetByIdAsync(KnownProductIdWithNullOptionals);
+
+        Assert.That(product, Is.Not.Null);
+        Assert.That(product!.Category, Is.Not.Null);
+        Assert.That(product.Category!.Id, Is.EqualTo(31));
+        Assert.That(product.Category.Name, Is.Not.Empty);
+    }
+
+    [Test]
+    public async Task GetAllAsync_ResolvesCategoryWithoutDroppingOrDuplicating()
+    {
+        var products = await _repository.GetAllAsync();
+
+        // Every seeded product has a category, so none should come back with a null one, and the
+        // category self-join must not fan out into duplicate rows.
+        Assert.That(products.Select(p => p.ProductId), Is.Unique);
+        Assert.That(products, Has.All.Property("Category").Not.Null);
+
+        var known = products.Single(p => p.ProductId == KnownProductId);
+        Assert.That(known.Category!.Name, Is.EqualTo("Road Frames"));
+        Assert.That(known.Category.ParentName, Is.EqualTo("Components"));
+    }
 }

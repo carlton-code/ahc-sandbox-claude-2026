@@ -25,6 +25,11 @@ namespace AHC.Sandbox.Domain.Entities
         // path, which never touches the view.
         public string? Description { get; init; }
 
+        // Resolved category (subcategory name + parent name), populated on the read path only from
+        // SalesLT.ProductCategory. Null when the product has no category, or on the write path.
+        // ProductCategoryId above remains the raw FK the write path uses.
+        public ProductCategory? Category { get; init; }
+
         public bool IsDiscontinued => DiscontinuedDate is not null;
     }
 

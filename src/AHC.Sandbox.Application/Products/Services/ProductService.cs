@@ -147,13 +147,20 @@ namespace AHC.Sandbox.Application.Products.Services
                 ListPrice = product.ListPrice,
                 Size = product.Size,
                 Weight = product.Weight,
-                ProductCategoryId = product.ProductCategoryId,
                 ProductModelId = product.ProductModelId,
                 SellStartDate = product.SellStartDate,
                 SellEndDate = product.SellEndDate,
                 DiscontinuedDate = product.DiscontinuedDate,
                 IsDiscontinued = product.IsDiscontinued,
-                Description = product.Description
+                Description = product.Description,
+                Category = product.Category is null
+                    ? null
+                    : new ProductCategoryDto
+                    {
+                        Id = product.Category.Id,
+                        Name = product.Category.Name,
+                        ParentName = product.Category.ParentName
+                    }
             };
         }
     }

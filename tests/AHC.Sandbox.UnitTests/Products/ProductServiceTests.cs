@@ -39,7 +39,8 @@ namespace AHC.Sandbox.UnitTests.Products
             int? productModelId = 6,
             DateTime? sellEndDate = null,
             DateTime? discontinuedDate = null,
-            string? description = "Our lightest and best quality aluminum frame.")
+            string? description = "Our lightest and best quality aluminum frame.",
+            ProductCategory? category = null)
         {
             return new Product
             {
@@ -56,7 +57,12 @@ namespace AHC.Sandbox.UnitTests.Products
                 SellStartDate = new DateTime(2002, 6, 1),
                 SellEndDate = sellEndDate,
                 DiscontinuedDate = discontinuedDate,
-                Description = description
+                Description = description,
+                // No category id -> no resolved category. Otherwise use the explicit category if
+                // given, else a sensible default matching the id.
+                Category = productCategoryId is null
+                    ? null
+                    : category ?? new ProductCategory { Id = productCategoryId.Value, Name = "Road Frames", ParentName = "Components" }
             };
         }
 
@@ -115,13 +121,16 @@ namespace AHC.Sandbox.UnitTests.Products
             Assert.That(result.ListPrice, Is.EqualTo(1431.50m));
             Assert.That(result.Size, Is.EqualTo("58"));
             Assert.That(result.Weight, Is.EqualTo(1016.04m));
-            Assert.That(result.ProductCategoryId, Is.EqualTo(18));
             Assert.That(result.ProductModelId, Is.EqualTo(6));
             Assert.That(result.SellStartDate, Is.EqualTo(new DateTime(2002, 6, 1)));
             Assert.That(result.SellEndDate, Is.EqualTo(new DateTime(2007, 6, 30)));
             Assert.That(result.DiscontinuedDate, Is.Null);
             Assert.That(result.IsDiscontinued, Is.False);
             Assert.That(result.Description, Is.EqualTo("Our lightest and best quality aluminum frame."));
+            Assert.That(result.Category, Is.Not.Null);
+            Assert.That(result.Category!.Id, Is.EqualTo(18));
+            Assert.That(result.Category.Name, Is.EqualTo("Road Frames"));
+            Assert.That(result.Category.ParentName, Is.EqualTo("Components"));
         }
 
         [Test]
@@ -133,6 +142,32 @@ namespace AHC.Sandbox.UnitTests.Products
 
             Assert.That(result, Is.Not.Null);
             Assert.That(result!.Description, Is.Null);
+        }
+
+        [Test]
+        public async Task GetProductByIdAsync_ProductWithNoCategory_MapsNullCategory()
+        {
+            _readRepository.Products.Add(CreateProduct(680, productCategoryId: null, category: null));
+
+            var result = await _service.GetProductByIdAsync(680);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result!.Category, Is.Null);
+        }
+
+        [Test]
+        public async Task GetProductByIdAsync_ProductOnRootCategory_MapsNullParentName()
+        {
+            _readRepository.Products.Add(CreateProduct(
+                680,
+                category: new ProductCategory { Id = 1, Name = "Bikes", ParentName = null }));
+
+            var result = await _service.GetProductByIdAsync(680);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result!.Category, Is.Not.Null);
+            Assert.That(result.Category!.Name, Is.EqualTo("Bikes"));
+            Assert.That(result.Category.ParentName, Is.Null);
         }
 
         [Test]

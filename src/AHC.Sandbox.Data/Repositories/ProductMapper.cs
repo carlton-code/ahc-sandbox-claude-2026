@@ -13,7 +13,11 @@ internal static class ProductMapper
     /// English description from <c>SalesLT.vProductAndDescription</c>, or null when the product has
     /// none. The write path doesn't read the view, so it leaves this null.
     /// </param>
-    internal static Product ToDomain(ProductEntity entity, string? description = null)
+    /// <param name="category">
+    /// Resolved category (name + parent name) from <c>SalesLT.ProductCategory</c>, or null when the
+    /// product has no category. Read path only — the write path leaves this null.
+    /// </param>
+    internal static Product ToDomain(ProductEntity entity, string? description = null, ProductCategory? category = null)
     {
         return new Product
         {
@@ -30,7 +34,8 @@ internal static class ProductMapper
             SellStartDate = entity.SellStartDate,
             SellEndDate = entity.SellEndDate,
             DiscontinuedDate = entity.DiscontinuedDate,
-            Description = description
+            Description = description,
+            Category = category
         };
     }
 }

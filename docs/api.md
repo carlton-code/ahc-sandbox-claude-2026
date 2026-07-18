@@ -195,15 +195,22 @@ All three mutations can return `409 Conflict` (a generic `ProblemDetails`, produ
 ### DTO shapes (`Application/Products/Dtos/`)
 
 - **`ProductDto`**: `productId` (int), `name`, `productNumber`, `color?`, `standardCost`
-  (decimal), `listPrice` (decimal), `size?`, `weight?` (decimal), `productCategoryId?` (int),
-  `productModelId?` (int), `sellStartDate`, `sellEndDate?`, `discontinuedDate?`, `isDiscontinued`
+  (decimal), `listPrice` (decimal), `size?`, `weight?` (decimal), `productModelId?` (int),
+  `sellStartDate`, `sellEndDate?`, `discontinuedDate?`, `isDiscontinued`
   (bool — computed: `discontinuedDate != null`), `description?` (string — the English marketing
-  copy from `SalesLT.vProductAndDescription`; `null` for the one seeded product that has none).
-  `description` is read-only — it's not on `CreateProductDto`/`UpdateProductDto`, and a
-  just-created product reads back `null` until the view has a row for it.
+  copy from `SalesLT.vProductAndDescription`; `null` for the one seeded product that has none),
+  and `category?`.
+  - **`category`** is a nested object `{ id (int), name, parentName? }` resolved from
+    `SalesLT.ProductCategory` — the subcategory the product sits on plus its parent's name
+    (`parentName` is `null` for a category that is itself a root). It **replaces** the old bare
+    `productCategoryId` on this read DTO. `null` when the product has no category.
+  - Both `description` and `category` are **read-only, derived** — not on
+    `CreateProductDto`/`UpdateProductDto`, and a just-created product reads them back `null` until
+    re-read.
 - **`CreateProductDto`**: `name`, `productNumber`, `color?`, `standardCost`, `listPrice`, `size?`,
   `weight?`, `productCategoryId?`, `productModelId?`, `sellStartDate`, `sellEndDate?`,
-  `discontinuedDate?`.
+  `discontinuedDate?`. `productCategoryId` is here (not the nested `category`): you **assign** a
+  category by id on write, and `ProductDto.category` is the read-side resolution of it.
 - **`UpdateProductDto`**: same shape as `CreateProductDto` (full replace).
 
 The table's binary thumbnail columns (`ThumbNailPhoto`/`ThumbnailPhotoFileName`) are deliberately
