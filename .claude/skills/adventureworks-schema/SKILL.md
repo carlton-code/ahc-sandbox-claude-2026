@@ -28,11 +28,12 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME, c.ORDINAL_POSITION;
 ```
 
 Already mapped in this codebase: `SalesLT.Customer`, `SalesLT.Address`,
-`SalesLT.CustomerAddress`, `SalesLT.Product`, `SalesLT.SalesOrderHeader`,
-`SalesLT.SalesOrderDetail`, `SalesLT.ProductModel`, `SalesLT.ProductDescription`,
-`SalesLT.ProductModelProductDescription`, and the `SalesLT.vProductAndDescription` view (keyless)
-(see `Data/Context/AdventureWorksLtDbContext.cs` for the authoritative Fluent API mapping — that's
-a better source of truth than this file for the columns it covers).
+`SalesLT.CustomerAddress`, `SalesLT.Product`, `SalesLT.ProductCategory`,
+`SalesLT.SalesOrderHeader`, `SalesLT.SalesOrderDetail`, `SalesLT.ProductModel`,
+`SalesLT.ProductDescription`, `SalesLT.ProductModelProductDescription`, and the
+`SalesLT.vProductAndDescription` view (keyless) (see `Data/Context/AdventureWorksLtDbContext.cs`
+for the authoritative Fluent API mapping — that's a better source of truth than this file for the
+columns it covers).
 Read via raw SQL instead, because they're unmapped: the two `Rewards` tables (see
 `CustomerReadRepository.cs`, which also keeps four grandfathered raw reads over the now-mapped
 `SalesOrderHeader` — see `docs/adr/0010-map-order-tables-keep-legacy-raw-reads.md`).
@@ -138,7 +139,7 @@ because both have database defaults (unlike ADR-0007's password columns).
 
 Skip `ThumbNailPhoto`/`ThumbnailPhotoFileName` in any DTO (binary/large, not useful over the API).
 
-### SalesLT.ProductCategory — not used by any code
+### SalesLT.ProductCategory — mapped (`ProductCategoryEntity`)
 
 | Column | Type | Nullable |
 |---|---|---|
@@ -147,6 +148,13 @@ Skip `ThumbNailPhoto`/`ThumbnailPhotoFileName` in any DTO (binary/large, not use
 | Name | nvarchar(50) | NO |
 | rowguid | uniqueidentifier | NO |
 | ModifiedDate | datetime | NO |
+
+Backs the resolved `ProductDto.category` (`{ id, name, parentName? }`) — `ProductReadRepository`
+joins it onto the product and self-joins on `ParentProductCategoryID` for the parent name.
+`ProductCategoryID`/`ParentProductCategoryID`/`Name` mapped; `rowguid`/`ModifiedDate` unmapped
+(defaults). Self-referencing two-level tree: products sit on subcategories (non-root); no product is
+on a root today. This was mapped **in preference to the `vGetAllCategories` view**, which omits root
+categories — the table join stays correct if a product is ever placed on a root (`parentName` null).
 
 ### SalesLT.ProductModel / ProductDescription / ProductModelProductDescription — mapped
 
@@ -236,7 +244,9 @@ code today (see below); the other two are unused.
   flattens the `ProductCategory` self-hierarchy to `(parent name, category name, category id)`.
   Only returns categories that *have* a parent — the four roots (`Bikes`, `Components`, `Clothing`,
   `Accessories`) appear only in the `ParentProductCategoryName` column, never as a row of their
-  own. Saves hand-rolling the self-join if a "categories with parent names" read is ever needed.
+  own. **Unused, by choice:** `ProductDto.category` resolves names from the `ProductCategory` table
+  (self-joined), not this view — precisely because the view omits roots, so a product on a root
+  category would lose its name. The view would only fit a category *browsing* endpoint.
 - **vProductAndDescription** — `ProductID` int NOT NULL, `Name` nvarchar(50) NOT NULL,
   `ProductModel` nvarchar(50) NOT NULL, `Culture` nchar(6) NOT NULL, `Description` nvarchar(400)
   NOT NULL. **1,764 rows.** Joins Product → ProductModel → ProductModelProductDescription →

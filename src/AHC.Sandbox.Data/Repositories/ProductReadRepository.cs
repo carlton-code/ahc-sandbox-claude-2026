@@ -17,43 +17,76 @@ public class ProductReadRepository : IProductReadRepository
 
     public async Task<IReadOnlyCollection<Product>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await (
-            from p in _dbContext.Products.AsNoTracking()
-            join d in EnglishDescriptions()
-                on p.ProductId equals d.ProductId into descriptions
-            from d in descriptions.DefaultIfEmpty()
+        var rows = await ProductReadRows(_dbContext.Products.AsNoTracking())
             // Name is unique in SalesLT.Product, so this ordering is already deterministic;
             // ProductId is a tiebreaker only in case that constraint ever goes away.
-            orderby p.Name, p.ProductId
-            select new { Product = p, Description = d != null ? d.Description : null })
+            .OrderBy(r => r.Product.Name)
+            .ThenBy(r => r.Product.ProductId)
             .ToArrayAsync(cancellationToken);
 
         return rows
-            .Select(r => ProductMapper.ToDomain(r.Product, r.Description))
+            .Select(ToDomain)
             .ToArray();
     }
 
     public async Task<Product?> GetByIdAsync(int productId, CancellationToken cancellationToken = default)
     {
-        var row = await (
-            from p in _dbContext.Products.AsNoTracking()
-            where p.ProductId == productId
-            join d in EnglishDescriptions()
-                on p.ProductId equals d.ProductId into descriptions
-            from d in descriptions.DefaultIfEmpty()
-            select new { Product = p, Description = d != null ? d.Description : null })
+        var row = await ProductReadRows(_dbContext.Products.AsNoTracking().Where(p => p.ProductId == productId))
             .FirstOrDefaultAsync(cancellationToken);
 
-        return row is null ? null : ProductMapper.ToDomain(row.Product, row.Description);
+        return row is null ? null : ToDomain(row);
     }
 
-    // The description enrichment comes from SalesLT.vProductAndDescription, which carries one row
-    // per product per culture. Filter to English before the LEFT JOIN (Culture is nchar(6), so
-    // space-padded — LIKE 'en%', never = 'en'), and keep it a LEFT JOIN via DefaultIfEmpty so the
-    // one seeded product with no English description still comes back (with a null description)
-    // rather than being dropped.
+    // One query that resolves both read enrichments off the product:
+    // - the English description via SalesLT.vProductAndDescription (LEFT JOIN, filtered to en);
+    // - the category via SalesLT.ProductCategory, plus a self-join for the parent's name.
+    // All LEFT JOINs: a product keeps coming back when it has no description, no category, or a
+    // category that is itself a root (ParentName null).
+    private IQueryable<ProductReadRow> ProductReadRows(IQueryable<ProductEntity> products)
+        => from p in products
+           join d in EnglishDescriptions()
+               on p.ProductId equals d.ProductId into descriptions
+           from d in descriptions.DefaultIfEmpty()
+           join c in _dbContext.ProductCategories.AsNoTracking()
+               on p.ProductCategoryId equals c.ProductCategoryId into categories
+           from c in categories.DefaultIfEmpty()
+           join parent in _dbContext.ProductCategories.AsNoTracking()
+               on c.ParentProductCategoryId equals (int?)parent.ProductCategoryId into parents
+           from parent in parents.DefaultIfEmpty()
+           select new ProductReadRow
+           {
+               Product = p,
+               Description = d != null ? d.Description : null,
+               CategoryId = c != null ? (int?)c.ProductCategoryId : null,
+               CategoryName = c != null ? c.Name : null,
+               ParentCategoryName = parent != null ? parent.Name : null
+           };
+
+    private static Product ToDomain(ProductReadRow row)
+        => ProductMapper.ToDomain(
+            row.Product,
+            row.Description,
+            row.CategoryId is null
+                ? null
+                : new ProductCategory
+                {
+                    Id = row.CategoryId.Value,
+                    Name = row.CategoryName ?? string.Empty,
+                    ParentName = row.ParentCategoryName
+                });
+
     private IQueryable<ProductDescriptionView> EnglishDescriptions()
         => _dbContext.ProductDescriptions
             .AsNoTracking()
+            // Culture is nchar(6), so space-padded — LIKE 'en%', never = 'en'.
             .Where(v => EF.Functions.Like(v.Culture, "en%"));
+
+    private sealed class ProductReadRow
+    {
+        public required ProductEntity Product { get; init; }
+        public string? Description { get; init; }
+        public int? CategoryId { get; init; }
+        public string? CategoryName { get; init; }
+        public string? ParentCategoryName { get; init; }
+    }
 }

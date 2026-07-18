@@ -18,6 +18,8 @@ public class AdventureWorksLtDbContext : DbContext
 
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
 
+    public DbSet<ProductCategoryEntity> ProductCategories => Set<ProductCategoryEntity>();
+
     public DbSet<ProductDescriptionView> ProductDescriptions => Set<ProductDescriptionView>();
 
     public DbSet<ProductModelEntity> ProductModels => Set<ProductModelEntity>();
@@ -213,6 +215,28 @@ public class AdventureWorksLtDbContext : DbContext
             entity.Property(e => e.DiscontinuedDate)
                 .HasColumnName("DiscontinuedDate")
                 .HasColumnType("datetime");
+        });
+
+        // ProductCategory backs the resolved category on the product read (name + parent name). A
+        // self-referencing two-level tree; ParentProductCategoryID is mapped as a plain nullable
+        // scalar (no navigation) and the read repository self-joins on it. rowguid/ModifiedDate
+        // unmapped as usual (NOT NULL, database defaults).
+        modelBuilder.Entity<ProductCategoryEntity>(entity =>
+        {
+            entity.ToTable("ProductCategory", "SalesLT");
+
+            entity.HasKey(e => e.ProductCategoryId);
+
+            entity.Property(e => e.ProductCategoryId)
+                .HasColumnName("ProductCategoryID");
+
+            entity.Property(e => e.ParentProductCategoryId)
+                .HasColumnName("ParentProductCategoryID");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("Name")
+                .HasMaxLength(50)
+                .IsRequired();
         });
 
         // vProductAndDescription is a view, not a table: mapped as a keyless entity

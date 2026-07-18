@@ -214,17 +214,35 @@ the model resource and the description edit. See
 - **Touched by:** `Data/Repositories/ProductModelReadRepository.cs`,
   `ProductModelWriteRepository.cs`.
 
+### `SalesLT.ProductCategory`
+
+The resolved category on the product read: `ProductDto.category` = `{ id, name, parentName? }`,
+joined onto the `Product` reads. It replaced the bare `productCategoryId` on that read DTO (the
+write DTOs keep the id).
+
+- **Mapped by:** `ProductCategoryEntity` + Fluent API config in `AdventureWorksLtDbContext`, read
+  with LINQ.
+- **Columns currently mapped:** `ProductCategoryID`, `ParentProductCategoryID`, `Name`.
+  `rowguid`/`ModifiedDate` unmapped (defaults).
+- **Self-referencing two-level tree:** roots (`ParentProductCategoryID` null) and subcategories.
+  `ProductReadRepository` self-joins the table on `ParentProductCategoryID` for the parent's name;
+  `parentName` is null for a root category.
+- **Read via the table, not `vGetAllCategories`, on purpose.** The view only returns non-root
+  categories, so a product placed on a root category would read back no category name. Joining the
+  table directly covers every case. All 295 products currently sit on a subcategory (e.g. 680 →
+  "Road Frames" under "Components"), but the table join is the robust choice.
+- **Write path leaves it null:** the join runs only on reads, so a product echoed straight from
+  `POST`/`PUT` has `category: null` until re-read (like `description`).
+- **Touched by:** `Data/Repositories/ProductReadRepository.cs`.
+
 ## Not in use
 
 No entity, mapping, query, or controller exists for these — nothing here counts as "in use."
 
-- **`SalesLT.ProductCategory`** — no code references this. `Product.ProductCategoryID` FKs onto
-  it, but the id is exposed as-is; nothing reads the category itself. (`SalesLT.Product` is now
-  in use — see above.)
 - Two of the three catalog views — `vGetAllCategories`, `vProductModelCatalogDescription` (see the
-  note below). (`SalesLT.SalesOrderDetail`, the `vProductAndDescription` view, and the
-  `ProductModel`/`ProductDescription`/`ProductModelProductDescription` trio are now in use — see
-  above.)
+  note below). (`SalesLT.SalesOrderDetail`, the `vProductAndDescription` view, the
+  `ProductModel`/`ProductDescription`/`ProductModelProductDescription` trio, and
+  `SalesLT.ProductCategory` are now in use — see above.)
 - **`SalesIntelligence`** — an entirely unbuilt schema (product bundles, recommendations). See the
   schema skill for the table shapes if that work starts. (`Rewards` is now in use — see above.)
 - `dbo` housekeeping tables (`BuildVersion`, `ErrorLog`, `sysdiagrams`) — never relevant to this
@@ -238,12 +256,11 @@ schema skill's *Views* section. The short version:
 - **`vProductAndDescription` is now in use** — it backs `ProductDto.description` (see its "in use"
   entry above). It was the highest-value of the three: the only source of a human-readable product
   description, with 294 of 295 products covered in English.
-- **None of the remaining two simplifies an existing query.** No current repository joins
-  `ProductCategory` or `ProductModel`, so there's no hand-rolled join a view could replace. They're
-  *additive* — they'd enable new data on a route, not tidy up an existing one.
-- **`vGetAllCategories`** only helps if we decide to surface category *names*. `ProductDto` exposes
-  `ProductCategoryID` as a bare int; this view (parent name + category name + id, 37 rows) could
-  back a `/categories` list or add a category name to `ProductDto`. Purely a new feature, not a fix.
+- **`vGetAllCategories` was *considered* for the category enrichment but not used.** `ProductDto`
+  now exposes a resolved `category` object — but sourced from the `SalesLT.ProductCategory` table
+  (self-joined for the parent name), not this view. The view only returns non-root categories, so a
+  product on a root category would lose its name; the table join is robust for every case. The view
+  remains unused, and would only earn its keep for a category *browsing* endpoint.
 - **`vProductModelCatalogDescription`** — 6 rows, sparse marketing XML. Not worth a route on its
   own.
 
