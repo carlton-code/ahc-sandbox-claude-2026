@@ -9,7 +9,11 @@ namespace AHC.Sandbox.Data.Repositories;
 /// </summary>
 internal static class ProductMapper
 {
-    internal static Product ToDomain(ProductEntity entity)
+    /// <param name="description">
+    /// English description from <c>SalesLT.vProductAndDescription</c>, or null when the product has
+    /// none. The write path doesn't read the view, so it leaves this null.
+    /// </param>
+    internal static Product ToDomain(ProductEntity entity, string? description = null)
     {
         return new Product
         {
@@ -25,7 +29,8 @@ internal static class ProductMapper
             ProductModelId = entity.ProductModelId,
             SellStartDate = entity.SellStartDate,
             SellEndDate = entity.SellEndDate,
-            DiscontinuedDate = entity.DiscontinuedDate
+            DiscontinuedDate = entity.DiscontinuedDate,
+            Description = description
         };
     }
 }

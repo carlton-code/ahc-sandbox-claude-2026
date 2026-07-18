@@ -18,6 +18,8 @@ public class AdventureWorksLtDbContext : DbContext
 
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
 
+    public DbSet<ProductDescriptionView> ProductDescriptions => Set<ProductDescriptionView>();
+
     public DbSet<SalesOrderHeaderEntity> SalesOrderHeaders => Set<SalesOrderHeaderEntity>();
 
     public DbSet<SalesOrderDetailEntity> SalesOrderDetails => Set<SalesOrderDetailEntity>();
@@ -205,6 +207,31 @@ public class AdventureWorksLtDbContext : DbContext
             entity.Property(e => e.DiscontinuedDate)
                 .HasColumnName("DiscontinuedDate")
                 .HasColumnType("datetime");
+        });
+
+        // vProductAndDescription is a view, not a table: mapped as a keyless entity
+        // (HasNoKey().ToView) so EF treats it as query-only — it can't be tracked or written, which
+        // is exactly right for a read-only enrichment. This is the first view mapped in the model;
+        // the alternative (raw ADO.NET, as with the unmapped Rewards tables) isn't warranted here
+        // because a keyless entity + LINQ expresses the left join fine. Only ProductID/Culture/
+        // Description are mapped — Name/ProductModel aren't read. Culture is nchar(6), so its values
+        // are space-padded and must be filtered with LIKE 'en%', never = 'en'.
+        modelBuilder.Entity<ProductDescriptionView>(entity =>
+        {
+            entity.HasNoKey();
+
+            entity.ToView("vProductAndDescription", "SalesLT");
+
+            entity.Property(e => e.ProductId)
+                .HasColumnName("ProductID");
+
+            entity.Property(e => e.Culture)
+                .HasColumnName("Culture")
+                .HasColumnType("nchar(6)");
+
+            entity.Property(e => e.Description)
+                .HasColumnName("Description")
+                .HasMaxLength(400);
         });
 
         // SalesOrderHeader maps what the read-only Order slice serves. CreditCardApprovalCode is
