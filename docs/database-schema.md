@@ -181,6 +181,39 @@ reads (`GET /api/v1/products` and `/{id}`).
   `POST`/`PUT` has `description: null` until the view reflects it.
 - **Touched by:** `Data/Repositories/ProductReadRepository.cs` (`GetAllAsync`/`GetByIdAsync`).
 
+### `SalesLT.ProductModel` + `ProductDescription` + `ProductModelProductDescription`
+
+The write surface behind the description: the `ProductModel` resource (`api/v1/product-models`) and
+`PUT …/{id}/description`. Reads use `vProductAndDescription` (above); these three mapped tables back
+the model resource and the description edit. See
+`docs/adr/0012-edit-product-descriptions-at-the-model-level.md`.
+
+- **Mapped by:** `ProductModelEntity`, `ProductDescriptionEntity`,
+  `ProductModelProductDescriptionEntity` + Fluent API config in `AdventureWorksLtDbContext`, read
+  and written with LINQ/tracked EF (no raw SQL).
+- **Columns currently mapped:** `ProductModel.ProductModelID`/`Name`;
+  `ProductDescription.ProductDescriptionID`/`Description`;
+  `ProductModelProductDescription.ProductModelID`/`ProductDescriptionID`/`Culture`.
+  `rowguid`/`ModifiedDate` are unmapped on all three (NOT NULL, database defaults), and
+  `ProductModel.CatalogDescription` (xml) is unmapped — nothing reads it.
+- **The description is a model attribute, shared by every product on the model.** Editing it changes
+  all of them; **213 of 295 products share a model** with at least one sibling, which is why the
+  edit lives on a model route, not a product one (ADR-0012).
+- **Known gotcha:** `ProductDescriptionID` is an **IDENTITY** column — mapped
+  `ValueGeneratedOnAdd()`, so the create-description branch of `ProductModelWriteRepository` lets the
+  database assign it.
+- **Known gotcha:** `ProductModelProductDescription` has a **composite PK**
+  (`ProductModelID`, `ProductDescriptionID`, `Culture`), and `Culture` is `nchar(6)` —
+  space-padded, so matched with `LIKE 'en%'`. A new link is inserted with `"en"`; the database pads
+  it.
+- **Known gotcha:** the write is an **upsert** — a model with no English description gets a new
+  `ProductDescription` + link inserted (relying on their `rowguid`/`ModifiedDate` defaults). Only
+  `ProductModelID` 128 ("Rear Brakes", product 907) is in that state today.
+- **Cross-resource cache effect:** a description edit evicts every affected product from the Redis
+  product cache (`ProductModelService`), since `ProductDto.description` is cached per product.
+- **Touched by:** `Data/Repositories/ProductModelReadRepository.cs`,
+  `ProductModelWriteRepository.cs`.
+
 ## Not in use
 
 No entity, mapping, query, or controller exists for these — nothing here counts as "in use."
@@ -188,10 +221,10 @@ No entity, mapping, query, or controller exists for these — nothing here count
 - **`SalesLT.ProductCategory`** — no code references this. `Product.ProductCategoryID` FKs onto
   it, but the id is exposed as-is; nothing reads the category itself. (`SalesLT.Product` is now
   in use — see above.)
-- The rest of `SalesLT` — `ProductModel`, `ProductDescription`, `ProductModelProductDescription`,
-  and two of the three catalog views (`vGetAllCategories`, `vProductModelCatalogDescription` — see
-  the note below). (`SalesLT.SalesOrderDetail` and the `vProductAndDescription` view are now in
-  use — see above.)
+- Two of the three catalog views — `vGetAllCategories`, `vProductModelCatalogDescription` (see the
+  note below). (`SalesLT.SalesOrderDetail`, the `vProductAndDescription` view, and the
+  `ProductModel`/`ProductDescription`/`ProductModelProductDescription` trio are now in use — see
+  above.)
 - **`SalesIntelligence`** — an entirely unbuilt schema (product bundles, recommendations). See the
   schema skill for the table shapes if that work starts. (`Rewards` is now in use — see above.)
 - `dbo` housekeeping tables (`BuildVersion`, `ErrorLog`, `sysdiagrams`) — never relevant to this

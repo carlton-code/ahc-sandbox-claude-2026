@@ -50,8 +50,10 @@ resource (see `.claude/agents/api-scaffolder.md`) — `Domain/Entities/Customer.
 `Api/Controllers/CustomersController.cs`. Each layer's rule file (table above) points to the exact
 files to look at for that layer specifically.
 
-The API's top-level resources today are `Customer`, `Product`, and `Order` (`Product` was built
-by copying this pattern; `Order` is a read-only variant of it — no write repository, no cache;
+The API's top-level resources today are `Customer`, `Product`, `Order`, and `ProductModel`
+(`Product` was built by copying this pattern; `Order` is a read-only variant of it — no write
+repository, no cache; `ProductModel` is a read-plus-single-write slice owning the shared product
+description, and the first write that invalidates another resource's cache — see ADR-0012;
 `Customer` remains the richer reference). They aren't the only slices: customer
 addresses are a read-only sub-resource with their own Application/Data pieces
 (`Application/Addresses/**`, `Data/Entities/AddressEntity.cs`/`CustomerAddressEntity.cs`,

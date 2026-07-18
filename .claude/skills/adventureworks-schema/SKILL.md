@@ -28,10 +28,11 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME, c.ORDINAL_POSITION;
 ```
 
 Already mapped in this codebase: `SalesLT.Customer`, `SalesLT.Address`,
-`SalesLT.CustomerAddress`, `SalesLT.Product`, `SalesLT.SalesOrderHeader` and
-`SalesLT.SalesOrderDetail` (see `Data/Context/AdventureWorksLtDbContext.cs`
-for the authoritative Fluent API mapping — that's a better source of truth than this file for the
-columns it covers).
+`SalesLT.CustomerAddress`, `SalesLT.Product`, `SalesLT.SalesOrderHeader`,
+`SalesLT.SalesOrderDetail`, `SalesLT.ProductModel`, `SalesLT.ProductDescription`,
+`SalesLT.ProductModelProductDescription`, and the `SalesLT.vProductAndDescription` view (keyless)
+(see `Data/Context/AdventureWorksLtDbContext.cs` for the authoritative Fluent API mapping — that's
+a better source of truth than this file for the columns it covers).
 Read via raw SQL instead, because they're unmapped: the two `Rewards` tables (see
 `CustomerReadRepository.cs`, which also keeps four grandfathered raw reads over the now-mapped
 `SalesOrderHeader` — see `docs/adr/0010-map-order-tables-keep-legacy-raw-reads.md`).
@@ -147,15 +148,26 @@ Skip `ThumbNailPhoto`/`ThumbnailPhotoFileName` in any DTO (binary/large, not use
 | rowguid | uniqueidentifier | NO |
 | ModifiedDate | datetime | NO |
 
-### SalesLT.ProductModel / ProductDescription / ProductModelProductDescription — not yet used
+### SalesLT.ProductModel / ProductDescription / ProductModelProductDescription — mapped
+
+All three are mapped (`ProductModelEntity`, `ProductDescriptionEntity`,
+`ProductModelProductDescriptionEntity`) and back the `ProductModel` resource
+(`api/v1/product-models`) and its description upsert (`PUT …/{id}/description`) — see
+`ProductModelReadRepository`/`ProductModelWriteRepository` and
+`docs/adr/0012-edit-product-descriptions-at-the-model-level.md`. Reads still use the
+`vProductAndDescription` view; these tables are the write surface.
 
 - `ProductModel`: `ProductModelID` (PK), `Name` nvarchar(50) NOT NULL, `CatalogDescription` xml
-  (nullable), `rowguid`, `ModifiedDate`.
-- `ProductDescription`: `ProductDescriptionID` (PK), `Description` nvarchar(400) NOT NULL,
-  `rowguid`, `ModifiedDate`.
+  (nullable, **unmapped**), `rowguid`, `ModifiedDate`. Only `ProductModelID`/`Name` mapped.
+- `ProductDescription`: `ProductDescriptionID` (PK, **IDENTITY** → `ValueGeneratedOnAdd`),
+  `Description` nvarchar(400) NOT NULL, `rowguid`, `ModifiedDate`. Only the first two mapped;
+  `rowguid`/`ModifiedDate` unmapped (defaults) — the create-description path relies on those
+  defaults.
 - `ProductModelProductDescription`: composite PK (`ProductModelID`, `ProductDescriptionID`,
-  `Culture`), `Culture` nchar(6) NOT NULL, `rowguid`, `ModifiedDate`. Many-to-many join between
-  the two above, keyed per locale.
+  `Culture`), `Culture` nchar(6) NOT NULL (**space-padded** — match `LIKE 'en%'`), `rowguid`,
+  `ModifiedDate`. Many-to-many join between the two above, keyed per locale. A description edit is
+  scoped safely: no `ProductDescription` row is shared across mappings, so updating one touches
+  exactly one model+culture.
 
 ### SalesLT.SalesOrderHeader — mapped (`SalesOrderHeaderEntity`)
 
