@@ -99,8 +99,10 @@ The customer rewards-tier assignment, exposed by `GET /api/v1/customers/{id}/rew
 
 ### `SalesLT.Address` + `SalesLT.CustomerAddress`
 
-A customer's addresses, exposed by `GET /api/v1/customers/{id}/addresses` and
-`GET /api/v1/customers/{id}/addresses/{addressId}`.
+A customer's addresses, exposed by `GET /api/v1/customers/{id}/addresses`,
+`GET /api/v1/customers/{id}/addresses/{addressId}`, and the full CRUD surface on
+`AddressesController` (`POST /api/v1/customers/{id}/addresses`, plus `GET`/`PUT`/`DELETE` on
+`/api/v1/addresses/{addressId}` — see ADR-0013).
 
 - **EF-mapped** by `AddressEntity`/`CustomerAddressEntity` + Fluent API config in
   `Data/Context/AdventureWorksLtDbContext.cs`, read with plain LINQ. Mapped rather than read raw
@@ -110,8 +112,11 @@ A customer's addresses, exposed by `GET /api/v1/customers/{id}/addresses` and
   `StateProvince`/`CountryRegion`/`PostalCode`, and `CustomerAddress.CustomerID`/`AddressID`/
   `AddressType`. `rowguid`/`ModifiedDate` on both tables are deliberately unmapped.
 - **Safe to leave `rowguid`/`ModifiedDate` unmapped**, unlike ADR-0007's password columns: both are
-  `NOT NULL` but both have database defaults (`newid()`/`getdate()`), so their absence can't break
-  an insert if writes are ever added.
+  `NOT NULL` but both have database defaults (`newid()`/`getdate()`), so their absence doesn't
+  break the insert on the create path.
+- **`Address.AddressID` is IDENTITY.** The create path relies on EF generating it and fixing it
+  into the `CustomerAddress` link row's foreign key, so the two rows are written in one
+  `SaveChangesAsync` and no orphan address exists in between.
 - **Known gotcha:** `StateProvince`, `CountryRegion` and `AddressType` are the `Name` **alias type**
   in this database, not `nvarchar` directly. EF maps them fine as the underlying `nvarchar(50)`.
 - **Known gotcha:** **440 of 847 customers have no address at all** — an empty list is the majority
@@ -120,10 +125,17 @@ A customer's addresses, exposed by `GET /api/v1/customers/{id}/addresses` and
 - **Known gotcha:** `AddressType` is only ever `Main Office` (407 rows) or `Shipping` (10). The 10
   customers with two addresses have one of each — which is why the read orders by `AddressType`
   then `AddressID` rather than by id alone.
-- **`SalesOrderHeader.ShipToAddressID`/`BillToAddressID` also FK onto `Address`.** Irrelevant to
-  these read-only endpoints, but it means a future hard `DELETE` of an address can violate a
-  constraint.
-- **Touched by:** `Data/Repositories/AddressReadRepository.cs`.
+- **`SalesOrderHeader.ShipToAddressID`/`BillToAddressID` also FK onto `Address`**, on top of
+  `CustomerAddress.AddressID`. All are `NO_ACTION`, so `DELETE /api/v1/addresses/{id}` is refused
+  with `409` for any address that's linked or ordered against — which is every address this API can
+  reach. See ADR-0013.
+- **Known gotcha:** the `CustomerAddress`→`Address` relationship is mapped
+  `.OnDelete(DeleteBehavior.ClientNoAction)` to match those `NO_ACTION` foreign keys. Without it
+  EF defaults a required relationship to `Cascade` and applies it **client-side too**, silently
+  deleting a tracked link row along with the address — making the delete succeed when it should be
+  refused. Don't remove it.
+- **Touched by:** `Data/Repositories/AddressReadRepository.cs`,
+  `Data/Repositories/AddressWriteRepository.cs`, `Data/Repositories/AddressMapper.cs`.
 
 ### `SalesLT.Product`
 

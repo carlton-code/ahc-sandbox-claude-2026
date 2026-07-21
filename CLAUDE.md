@@ -50,14 +50,18 @@ resource (see `.claude/agents/api-scaffolder.md`) — `Domain/Entities/Customer.
 `Api/Controllers/CustomersController.cs`. Each layer's rule file (table above) points to the exact
 files to look at for that layer specifically.
 
-The API's top-level resources today are `Customer`, `Product`, `Order`, and `ProductModel`
+The API's top-level resources today are `Customer`, `Product`, `Order`, `ProductModel`, and
+`Address`
 (`Product` was built by copying this pattern; `Order` is a read-only variant of it — no write
 repository, no cache; `ProductModel` is a read-plus-single-write slice owning the shared product
 description, and the first write that invalidates another resource's cache — see ADR-0012;
-`Customer` remains the richer reference). They aren't the only slices: customer
-addresses are a read-only sub-resource with their own Application/Data pieces
-(`Application/Addresses/**`, `Data/Entities/AddressEntity.cs`/`CustomerAddressEntity.cs`,
-`Data/Repositories/AddressReadRepository.cs`), exposed through `CustomersController`. See
+`Customer` remains the richer reference). `Address` is the odd one: it deliberately spans two
+route prefixes, because `SalesLT.Address` has no owner column — creating one is nested under a
+customer (`POST /customers/{id}/addresses`, which writes the `CustomerAddress` link row too) while
+reading/editing/deleting one is top-level (`/addresses/{id}`). Its two customer-scoped *reads*
+still hang off `CustomersController`. See ADR-0013 before changing any of that, and
+`Application/Addresses/**` + `Data/Repositories/AddressReadRepository.cs`/`AddressWriteRepository.cs`
+for the code. See
 `docs/database-schema.md` for a curated summary of the tables this codebase actually touches, and
 `.claude/skills/adventureworks-schema` for the full verified column-level reference across every
 schema if you need more than that summary.

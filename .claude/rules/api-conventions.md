@@ -5,7 +5,10 @@ paths:
 
 # API-layer conventions
 
-- Route pattern: `api/v1/[controller]` (lowercase plural resource names).
+- Route pattern: `api/v1/[controller]` (lowercase plural resource names). The lowercasing is
+  enforced globally by `LowercaseUrls = true` in `Program.cs`, not by each controller — without it
+  the `[controller]` token renders the class name verbatim (`/api/v1/Customers/...`) and drifts
+  from any explicit lowercase template. Keep any new explicit route template lowercase to match.
 - Controllers depend only on an Application-layer service interface (e.g. `ICustomerService`) —
   never on a repository or `AdventureWorksLtDbContext` directly.
 - Bind requests/responses to DTOs only — never an EF entity or the `Domain` type directly. See
@@ -34,6 +37,14 @@ paths:
 
 ## Current state
 
-`CustomersController.cs`, `ProductsController.cs`, and `OrdersController.cs` are the controllers
-today. `CustomersController.cs` is the richest and the reference pattern to copy;
+`CustomersController.cs`, `ProductsController.cs`, `OrdersController.cs`,
+`ProductModelsController.cs`, and `AddressesController.cs` are the controllers today.
+`CustomersController.cs` is the richest and the reference pattern to copy;
 `OrdersController.cs` is the read-only example (two GETs, no writes by design).
+
+`AddressesController.cs` is the one exception to the route pattern above: it declares an
+**absolute template per action** and no class-level `[Route]`, because its create is nested under a
+customer (`POST /api/v1/customers/{customerId}/addresses`) while its other actions are top-level
+(`/api/v1/addresses/{addressId}`). Two `[Route]` attributes would not express that — each action
+template combines with *every* controller route, generating both prefixes for every action. Don't
+copy this shape onto a resource that doesn't need it; see ADR-0013 for why this one does.

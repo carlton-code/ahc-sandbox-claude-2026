@@ -28,5 +28,29 @@ namespace AHC.Sandbox.UnitTests.Addresses.Fakes
         {
             return Task.FromResult(Addresses.FirstOrDefault(a => a.AddressId == addressId));
         }
+
+        // Projects the same backing list down to AddressDto, dropping AddressType — the shape the
+        // real repository returns for the customer-less GET /api/v1/addresses/{addressId}.
+        public Task<AddressDto?> GetByIdAsync(int addressId, CancellationToken cancellationToken = default)
+        {
+            var match = Addresses.FirstOrDefault(a => a.AddressId == addressId);
+
+            if (match is null)
+            {
+                return Task.FromResult<AddressDto?>(null);
+            }
+
+            return Task.FromResult<AddressDto?>(new AddressDto
+            {
+                AddressId = match.AddressId,
+                AddressLine1 = match.AddressLine1,
+                AddressLine2 = match.AddressLine2,
+                City = match.City,
+                StateProvince = match.StateProvince,
+                CountryRegion = match.CountryRegion,
+                PostalCode = match.PostalCode,
+                SingleLineAddress = match.SingleLineAddress
+            });
+        }
     }
 }

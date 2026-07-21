@@ -86,8 +86,13 @@ public class AdventureWorksLtDbContext : DbContext
 
             entity.HasKey(e => e.AddressId);
 
+            // IDENTITY column. This is already EF's default for an int key, but pinned explicitly
+            // because AddressWriteRepository.CreateForCustomerAsync depends on EF generating the id
+            // and fixing it into the CustomerAddress link row — same reason as
+            // ProductDescriptionEntity below.
             entity.Property(e => e.AddressId)
-                .HasColumnName("AddressID");
+                .HasColumnName("AddressID")
+                .ValueGeneratedOnAdd();
 
             entity.Property(e => e.AddressLine1)
                 .HasColumnName("AddressLine1")
@@ -141,10 +146,20 @@ public class AdventureWorksLtDbContext : DbContext
             // WithMany() without a navigation: AddressEntity deliberately has no collection back
             // to CustomerAddress. Nothing reads addresses in that direction, and no address is
             // linked to more than one customer today anyway.
+            //
+            // ClientNoAction matches the real foreign key, which is NO_ACTION like every other one
+            // in this database. Without it EF defaults a required relationship to Cascade, and that
+            // default is client-side as well as server-side: deleting an Address while its
+            // CustomerAddress happened to be tracked made EF quietly delete the link row too, so the
+            // delete succeeded instead of being refused. That contradicts the documented behavior
+            // (ADR-0009, ADR-0013) and depended on what else the context had loaded. ClientNoAction
+            // leaves tracked dependents alone and lets the database refuse, which is the 547 that
+            // DatabaseConflictExceptionHandler turns into a 409.
             entity.HasOne(e => e.Address)
                 .WithMany()
                 .HasForeignKey(e => e.AddressId)
-                .IsRequired();
+                .IsRequired()
+                .OnDelete(DeleteBehavior.ClientNoAction);
         });
 
         // Product maps the catalog columns only. ThumbNailPhoto/ThumbnailPhotoFileName are

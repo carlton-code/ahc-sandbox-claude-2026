@@ -34,6 +34,7 @@ Each ADR follows the same shape (see `template.md`):
 | [0010](0010-map-order-tables-keep-legacy-raw-reads.md) | Map the order tables in EF, keep the legacy raw customer-order reads *(superseded by 0011)* |
 | [0011](0011-consolidate-order-reads-remove-raw-order-sql.md) | Consolidate order reads onto the Orders resource, delete the raw order SQL |
 | [0012](0012-edit-product-descriptions-at-the-model-level.md) | Edit product descriptions on a `ProductModel` resource, not per product |
+| [0013](0013-address-writes-split-across-two-route-prefixes.md) | Address create is nested under the customer, edit/delete are top-level |
 
 ## Adding a new ADR
 
