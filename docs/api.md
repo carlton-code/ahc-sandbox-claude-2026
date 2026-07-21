@@ -9,6 +9,9 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 ## Conventions
 
 - Base route: `api/v1/<resource>` (see each controller's `[Route("api/v1/[controller]")]`).
+  `Program.cs` sets `LowercaseUrls = true`, so the `[controller]` token renders lowercase and the
+  paths in this file match the live OpenAPI document character-for-character. Routing itself is
+  case-insensitive either way — `/api/v1/Customers` still resolves.
 - All request/response bodies are JSON.
 - Every status code below is declared on the action via `[ProducesResponseType]`, so the live
   OpenAPI document carries the same routes, status codes, and response schemas this file
@@ -46,6 +49,11 @@ drifted — see `.claude/agents/docs-writer.md` for how the two are kept aligned
 | GET | `/api/v1/customers/{customerId}/rewards` | — | `CustomerRewardsDto` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/addresses` | — | `CustomerAddressDto[]` | `200`, `404` |
 | GET | `/api/v1/customers/{customerId}/addresses/{addressId}` | — | `CustomerAddressDto` | `200`, `404` |
+| POST | `/api/v1/customers/{customerId}/addresses` | `CreateCustomerAddressDto` | `CustomerAddressDto` | `201` (+ `Location` header via `CreatedAtAction`), `400`, `404`, `409` |
+
+The two address `GET`s live on `CustomersController`; the `POST` is on `AddressesController`
+despite sharing their prefix. See the Addresses section below for why creating an address needs a
+customer in the route while editing one doesn't.
 
 There are no order-list routes under customers anymore: `/customers/{id}/orders`,
 `/customers/{id}/orders/{orderId}`, and `/customers/{id}/recent-orders` were removed in favor of
@@ -144,6 +152,70 @@ have one `Main Office` and one `Shipping`.
 
 `GET /api/v1/customers/{customerId}/addresses/{addressId}` is scoped to the customer: a real
 `addressId` that belongs to a *different* customer returns `404`, not that customer's address.
+
+## Addresses — `api/v1/addresses`
+
+**Status:** fully implemented — `Controllers/AddressesController.cs`.
+
+This resource **deliberately spans two route prefixes**, which is why its controller declares
+absolute route templates per action rather than a class-level `[Route]`. `SalesLT.Address` has no
+owner column — the customer link and `addressType` live on `SalesLT.CustomerAddress` — so
+*creating* an address needs a customer in the route (otherwise it orphans a row nothing can reach),
+while *reading, editing and deleting* one doesn't. See
+`docs/adr/0013-address-writes-split-across-two-route-prefixes.md`.
+
+| Method | Path | Request body | Response body | Status codes |
+|---|---|---|---|---|
+| POST | `/api/v1/customers/{customerId}/addresses` | `CreateCustomerAddressDto` | `CustomerAddressDto` | `201` (+ `Location` header via `CreatedAtAction`), `400`, `404`, `409` |
+| GET | `/api/v1/addresses/{addressId}` | — | `AddressDto` | `200`, `404` |
+| PUT | `/api/v1/addresses/{addressId}` | `UpdateAddressDto` | — | `204`, `400`, `404` |
+| DELETE | `/api/v1/addresses/{addressId}` | — | — | `204`, `404`, `409` |
+
+The two customer-scoped address **reads** stay under Customers (see that section) — they're list
+views of one customer's addresses, and they're the only place `addressType` is exposed.
+
+`POST` writes the address and its `SalesLT.CustomerAddress` link row in one transaction, so there
+is no way to create an unattached address through this API — and equally no way to attach an
+existing address to a second customer. `404` on `POST` means no such customer.
+
+### `DELETE` always returns `409`
+
+Deleting an address does **not** unlink it first. Every foreign key in this database is
+`NO_ACTION`, so the delete is refused whenever anything still references the address — a customer
+link, or an order's `ShipToAddressID`/`BillToAddressID` — and
+`DatabaseConflictExceptionHandler` maps that to `409`, exactly as for
+`DELETE /api/v1/customers/{customerId}` (ADR-0009).
+
+Because `POST` always writes a link row, and every seeded address already has one, **no address
+this endpoint can reach is unreferenced** — so `409` is the only outcome a caller can actually
+provoke. `204` is declared and implemented, but not reachable. That's an accepted trade-off, not a
+gap: see ADR-0013.
+
+### Request validation — `400`
+
+`POST` requires `addressLine1`, `city`, `stateProvince`, `countryRegion`, `postalCode` and
+`addressType`; `PUT` requires the same minus `addressType`. All reject empty and whitespace-only
+values, not just missing ones. `addressLine2` is optional on both. Every field is length-capped to
+its real column width (`addressLine1`/`addressLine2` 60, `city` 30, `stateProvince` 50,
+`countryRegion` 50, `postalCode` 15, `addressType` 50).
+
+`addressType` is **not** validated against `Main Office`/`Shipping` even though those are its only
+values in the data — the column has no check constraint, so restricting it here would be the API
+inventing a rule the database doesn't have.
+
+`PUT` replaces the whole record, so omitting `addressLine2` clears it. There is no `PATCH` — an
+address is a small record replaced wholesale.
+
+### DTOs
+
+- **`AddressDto`**: `addressId` (int), `addressLine1`, `addressLine2?`, `city`, `stateProvince`,
+  `countryRegion`, `postalCode`, `singleLineAddress`. Deliberately **no `addressType`** — that
+  describes a customer↔address link, and these routes name no customer. Use the customer-scoped
+  reads when the type is needed.
+- **`CreateCustomerAddressDto`**: the six address fields (`addressLine2` optional) plus
+  `addressType`.
+- **`UpdateAddressDto`**: the six address fields only. `addressType` is not editable here — it
+  belongs to the link row, not the address.
 
 ## Products — `api/v1/products`
 

@@ -37,7 +37,15 @@ The API layer should:
 
 ### Conventions actually in use
 
-- Route pattern: `[Route("api/v1/[controller]")]`.
+- Route pattern: `[Route("api/v1/[controller]")]`, lowercased globally by
+  `LowercaseUrls = true` in `Program.cs` so generated URLs and the OpenAPI document agree with the
+  convention rather than echoing the class name's casing. One deliberate exception:
+  `AddressesController` declares an **absolute route template per action** and no class-level
+  `[Route]`, because its create is nested under a customer
+  (`POST /api/v1/customers/{customerId}/addresses`) while its other actions are top-level
+  (`/api/v1/addresses/{addressId}`). Two `[Route]` attributes can't express that — each action
+  template combines with *every* controller route. Don't copy the shape onto a resource that
+  doesn't need it; see `docs/adr/0013-address-writes-split-across-two-route-prefixes.md`.
 - Status codes: `NotFound()` when a nullable lookup returns `null`; `NoContent()` on a successful
   mutation; `NotFound()` on a mutation whose target doesn't exist; `CreatedAtAction` on `POST`.
 - A write that violates a database constraint surfaces as `409 Conflict`, translated by
@@ -69,8 +77,9 @@ Code that belongs here:
 
 - `Program.cs` — composition root and middleware pipeline
 - Controllers — `CustomersController` (the richest one, and the reference pattern to copy),
-  `ProductsController`, and `OrdersController` (the read-only example — two GETs, no writes by
-  design).
+  `ProductsController`, `OrdersController` (the read-only example — two GETs, no writes by
+  design), `ProductModelsController`, and `AddressesController` (the two-route-prefix exception
+  noted above).
 - `Infrastructure/DatabaseConflictExceptionHandler.cs` — cross-cutting HTTP concern: translates
   database constraint violations into `409` responses instead of unhandled 500s.
 

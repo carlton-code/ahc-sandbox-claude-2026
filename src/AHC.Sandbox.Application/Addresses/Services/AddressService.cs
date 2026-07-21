@@ -7,13 +7,16 @@ namespace AHC.Sandbox.Application.Addresses.Services
     public class AddressService : IAddressService
     {
         private readonly IAddressReadRepository _addressReadRepository;
+        private readonly IAddressWriteRepository _addressWriteRepository;
         private readonly ICustomerReadRepository _customerReadRepository;
 
         public AddressService(
             IAddressReadRepository addressReadRepository,
+            IAddressWriteRepository addressWriteRepository,
             ICustomerReadRepository customerReadRepository)
         {
             _addressReadRepository = addressReadRepository;
+            _addressWriteRepository = addressWriteRepository;
             _customerReadRepository = customerReadRepository;
         }
 
@@ -41,6 +44,42 @@ namespace AHC.Sandbox.Application.Addresses.Services
             CancellationToken cancellationToken = default)
         {
             return _addressReadRepository.GetByCustomerAndAddressIdAsync(customerId, addressId, cancellationToken);
+        }
+
+        public Task<AddressDto?> GetAddressByIdAsync(int addressId, CancellationToken cancellationToken = default)
+        {
+            return _addressReadRepository.GetByIdAsync(addressId, cancellationToken);
+        }
+
+        public async Task<CustomerAddressDto?> CreateCustomerAddressAsync(
+            int customerId,
+            CreateCustomerAddressDto address,
+            CancellationToken cancellationToken = default)
+        {
+            // The same probe GetCustomerAddressesAsync does, for a different reason: without it the
+            // CustomerAddress insert fails on its foreign key, and the API would answer a bad
+            // customer id with 409 rather than the 404 it actually is.
+            var customer = await _customerReadRepository.GetByIdAsync(customerId, cancellationToken);
+
+            if (customer is null)
+            {
+                return null;
+            }
+
+            return await _addressWriteRepository.CreateForCustomerAsync(customerId, address, cancellationToken);
+        }
+
+        public Task<bool> UpdateAddressAsync(
+            int addressId,
+            UpdateAddressDto address,
+            CancellationToken cancellationToken = default)
+        {
+            return _addressWriteRepository.UpdateAsync(addressId, address, cancellationToken);
+        }
+
+        public Task<bool> DeleteAddressAsync(int addressId, CancellationToken cancellationToken = default)
+        {
+            return _addressWriteRepository.DeleteAsync(addressId, cancellationToken);
         }
     }
 }

@@ -46,6 +46,16 @@ namespace AHC.Sandbox.Api
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddOpenApi();
 
+            // Generated URLs are lowercased so the OpenAPI document matches the route convention
+            // this project already writes down (api/v1/<resource>, lowercase). Without it the
+            // [controller] token renders the class name verbatim — "/api/v1/Customers/..." — while
+            // AddressesController's explicit templates are lowercase, so the same prefix appeared
+            // twice in the document and a generated client would see two resources. Routing itself
+            // has always been case-insensitive; this only affects generated links, Location headers
+            // and the OpenAPI paths. Safe because no route parameter in this API is a string —
+            // every one is :int, so there are no route values to mangle.
+            builder.Services.AddRouting(options => options.LowercaseUrls = true);
+
             builder.Services.AddApplication();
             builder.Services.AddData(builder.Configuration);
             builder.Services.AddInfrastructure(builder.Configuration);
@@ -58,7 +68,7 @@ namespace AHC.Sandbox.Api
             var app = builder.Build();
 
             // Must come before the endpoints it protects. Handlers that return false fall through
-            // to the default 500, so this only intercepts what it recognises.
+            // to the default 500, so this only intercepts what it recognizes.
             app.UseExceptionHandler();
 
             // Configure the HTTP request pipeline.

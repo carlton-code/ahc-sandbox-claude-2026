@@ -65,8 +65,10 @@ Code that belongs here:
 
 - `AdventureWorksLtDbContext` and its Fluent API mappings
 - `CustomerEntity` / `AddressEntity` / `CustomerAddressEntity` and future `<Resource>Entity` types
-- `CustomerReadRepository` / `CustomerWriteRepository` / `AddressReadRepository` and future
-  repository implementations
+- `CustomerReadRepository` / `CustomerWriteRepository` / `AddressReadRepository` /
+  `AddressWriteRepository` and future repository implementations
+- `AddressMapper` — entity → DTO mapping shared by the address read and write repositories, rather
+  than duplicated as a private helper in each
 - Parameterized raw SQL for queries over tables the `DbContext` doesn't map (today, only the
   `Rewards` tables)
 

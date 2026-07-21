@@ -2,7 +2,6 @@ using AHC.Sandbox.Application.Addresses.Dtos;
 using AHC.Sandbox.Application.Addresses.Interfaces;
 using AHC.Sandbox.Data.Context;
 using AHC.Sandbox.Data.Entities;
-using AHC.Sandbox.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace AHC.Sandbox.Data.Repositories;
@@ -37,7 +36,7 @@ public class AddressReadRepository : IAddressReadRepository
             .ToArrayAsync(cancellationToken);
 
         return rows
-            .Select(row => MapCustomerAddress(row.Address, row.AddressType))
+            .Select(row => AddressMapper.ToCustomerAddressDto(row.Address, row.AddressType))
             .ToArray();
     }
 
@@ -52,41 +51,18 @@ public class AddressReadRepository : IAddressReadRepository
             .Select(ca => new AddressRow(ca.Address, ca.AddressType))
             .FirstOrDefaultAsync(cancellationToken);
 
-        return row is null ? null : MapCustomerAddress(row.Address, row.AddressType);
+        return row is null ? null : AddressMapper.ToCustomerAddressDto(row.Address, row.AddressType);
     }
 
-    // SingleLineAddress is computed on the Domain entity, so the projection is materialized first
-    // and mapped in memory — the same shape as CustomerReadRepository.GetAllAsync.
-    private static CustomerAddressDto MapCustomerAddress(AddressEntity entity, string addressType)
+    // Backs GET /api/v1/addresses/{addressId}: the address record on its own, with no customer
+    // scoping and therefore no AddressType — that field belongs to the CustomerAddress link row.
+    public async Task<AddressDto?> GetByIdAsync(int addressId, CancellationToken cancellationToken = default)
     {
-        var address = MapAddress(entity);
+        var entity = await _dbContext.Addresses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.AddressId == addressId, cancellationToken);
 
-        return new CustomerAddressDto
-        {
-            AddressId = address.AddressId,
-            AddressLine1 = address.AddressLine1,
-            AddressLine2 = address.AddressLine2,
-            City = address.City,
-            StateProvince = address.StateProvince,
-            CountryRegion = address.CountryRegion,
-            PostalCode = address.PostalCode,
-            SingleLineAddress = address.SingleLineAddress,
-            AddressType = addressType
-        };
-    }
-
-    private static Address MapAddress(AddressEntity entity)
-    {
-        return new Address
-        {
-            AddressId = entity.AddressId,
-            AddressLine1 = entity.AddressLine1,
-            AddressLine2 = entity.AddressLine2,
-            City = entity.City,
-            StateProvince = entity.StateProvince,
-            CountryRegion = entity.CountryRegion,
-            PostalCode = entity.PostalCode
-        };
+        return entity is null ? null : AddressMapper.ToAddressDto(entity);
     }
 
     private sealed record AddressRow(AddressEntity Address, string AddressType);
